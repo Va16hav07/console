@@ -275,7 +275,8 @@
     "contour_status": "Contour",
     "crio_status": "CRI-O",
     "coredns_status": "CoreDNS",
-    "fluentd_status": "Fluentd"
+    "fluentd_status": "Fluentd",
+    "lima_status": "Lima"
   },
   "descriptions": {
     "cluster_health": "Overall health status of all connected Kubernetes clusters.",
@@ -440,7 +441,8 @@
     "flatcar_status": "Flatcar node OS versions, update status, and version distribution.",
     "contour_status": "Contour ingress proxy status, HTTPProxy resources.",
     "crio_status": "CRI-O container runtime metrics, image pulls, and pod sandbox status.",
-    "fluentd_status": "Log pipeline status, buffer utilization, and output plugin health."
+    "fluentd_status": "Log pipeline status, buffer utilization, and output plugin health.",
+    "lima_status": "Lima virtual machine instances and resource usage."
   },
   "categories": {
     "core": "Core",
@@ -2678,5 +2680,24 @@
     "retries": "Retries",
     "bufferUtilization": "Buffer utilization",
     "outputPlugins": "Output plugins"
+  },
+  "lima": {
+    "healthy": "Healthy",
+    "degraded": "Degraded",
+    "notDetected": "Lima Not Detected",
+    "notDetectedHint": "No Lima-managed nodes detected on connected clusters. Node names or labels starting with \"lima-\" or \"lima.sh/instance\" are used for detection.",
+    "totalInstances": "Instances",
+    "totalCpu": "vCPU Total",
+    "totalMemory": "Memory Total",
+    "instances": "Virtual Machine Instances",
+    "status_running": "Running",
+    "status_stopped": "Stopped",
+    "status_broken": "Broken",
+    "openDocs": "Lima Docs",
+    "fetchError": "Failed to fetch Lima status",
+    "syncedJustNow": "just now",
+    "syncedMinutesAgo": "{{count}}m ago",
+    "syncedHoursAgo": "{{count}}h ago",
+    "syncedDaysAgo": "{{count}}d ago"
   }
 }
