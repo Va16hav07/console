@@ -51,6 +51,7 @@ const DEFAULT_PRIMARY_NAV: SidebarItem[] = [
   { id: 'dashboard', name: 'Dashboard', icon: 'LayoutDashboard', href: '/', type: 'link', order: 0 },
   { id: 'clusters', name: 'My Clusters', icon: 'Server', href: '/clusters', type: 'link', order: 1 },
   { id: 'cluster-admin', name: 'Cluster Admin', icon: 'ShieldAlert', href: '/cluster-admin', type: 'link', order: 2 },
+  { id: 'compliance', name: 'Compliance', icon: 'ClipboardCheck', href: '/compliance', type: 'link', order: 2.5 },
   { id: 'deploy', name: 'Deploy', icon: 'Rocket', href: '/deploy', type: 'link', order: 3 },
   { id: 'insights', name: 'Insights', icon: 'Lightbulb', href: '/insights', type: 'link', order: 3.5 },
   { id: 'ai-ml', name: 'AI/ML', icon: 'Sparkles', href: '/ai-ml', type: 'link', order: 4 },
@@ -66,8 +67,7 @@ const DEFAULT_PRIMARY_NAV: SidebarItem[] = [
  * Users can add any of these to their sidebar via the customizer.
  */
 export const DISCOVERABLE_DASHBOARDS: SidebarItem[] = [
-  { id: 'compliance', name: 'Compliance', icon: 'ClipboardCheck', href: '/compliance', type: 'link', order: 0 },
-  { id: 'compute', name: 'Compute', icon: 'Monitor', href: '/compute', type: 'link', order: 1 },
+  { id: 'compute', name: 'Compute', icon: 'Monitor', href: '/compute', type: 'link', order: 0 },
   { id: 'cost', name: 'Cost', icon: 'DollarSign', href: '/cost', type: 'link', order: 2 },
   { id: 'data-compliance', name: 'Data Compliance', icon: 'Database', href: '/data-compliance', type: 'link', order: 3 },
   { id: 'deployments', name: 'Deployments', icon: 'Layers', href: '/deployments', type: 'link', order: 4 },
