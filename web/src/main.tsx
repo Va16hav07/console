@@ -136,11 +136,9 @@ enableMocking()
     // in parallel with the main bundle, reducing time-to-first-paint.
     await import('./lib/unified/registerHooks')
 
-    // Initialize GA4 analytics BEFORE first render so engagement tracking
-    // starts before PageViewTracker fires. The old setTimeout(() => ..., 0)
-    // deferred init to the next tick, causing engagementStartMs to be 0 when
-    // the first page_view flushed engagement — dropping all engagement time
-    // and crashing engaged sessions from 82% to 1.6%.
+    // Initialize analytics BEFORE first render so interaction-gate listeners
+    // register before the user clicks/scrolls. BrandingProvider will later
+    // call updateAnalyticsIds() to override measurement IDs for white-label.
     initAnalytics()
 
     ReactDOM.createRoot(document.getElementById('root')!).render(

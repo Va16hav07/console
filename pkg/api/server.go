@@ -75,6 +75,23 @@ type Config struct {
 	BenchmarkFolderID          string // Google Drive folder ID containing benchmark results
 	// Sidebar configuration
 	EnabledDashboards string // Comma-separated list of dashboard IDs to show in sidebar (empty = all)
+	// White-label project context (e.g., "kubestellar", "crossplane", "istio")
+	// Controls which project-specific cards, dashboards, and routes are active.
+	// Default: "kubestellar"
+	ConsoleProject string
+	// White-label branding configuration
+	BrandAppName      string // APP_NAME — display name (default: "KubeStellar Console")
+	BrandAppShortName string // APP_SHORT_NAME — compact name (default: "KubeStellar")
+	BrandTagline      string // APP_TAGLINE (default: "multi-cluster first, saving time and tokens")
+	BrandLogoURL      string // LOGO_URL — path to logo image (default: "/kubestellar-logo.svg")
+	BrandFaviconURL   string // FAVICON_URL (default: "/favicon.ico")
+	BrandThemeColor   string // THEME_COLOR — PWA theme color (default: "#7c3aed")
+	BrandDocsURL      string // DOCS_URL (default: "https://kubestellar.io/docs/console/readme")
+	BrandCommunityURL string // COMMUNITY_URL (default: "https://kubestellar.io/community")
+	BrandWebsiteURL   string // WEBSITE_URL (default: "https://kubestellar.io")
+	BrandIssuesURL    string // ISSUES_URL (default: "https://github.com/kubestellar/kubestellar/issues/new")
+	BrandRepoURL      string // REPO_URL (default: "https://github.com/kubestellar/console")
+	BrandHostedDomain string // HOSTED_DOMAIN — domain for demo mode (default: "console.kubestellar.io")
 	// Watchdog support: when set, the backend listens on this port instead of Port
 	BackendPort int
 }
@@ -367,8 +384,29 @@ func (s *Server) setupRoutes() {
 			"in_cluster":       inCluster,
 			"install_method":   detectInstallMethod(inCluster),
 			"self_upgrade":     os.Getenv("SELF_UPGRADE_ENABLED") == "true",
+			"project":          s.config.ConsoleProject,
+			"branding": fiber.Map{
+				"appName":           s.config.BrandAppName,
+				"appShortName":      s.config.BrandAppShortName,
+				"tagline":           s.config.BrandTagline,
+				"logoUrl":           s.config.BrandLogoURL,
+				"faviconUrl":        s.config.BrandFaviconURL,
+				"themeColor":        s.config.BrandThemeColor,
+				"docsUrl":           s.config.BrandDocsURL,
+				"communityUrl":      s.config.BrandCommunityURL,
+				"websiteUrl":        s.config.BrandWebsiteURL,
+				"issuesUrl":         s.config.BrandIssuesURL,
+				"repoUrl":           s.config.BrandRepoURL,
+				"hostedDomain":      s.config.BrandHostedDomain,
+				"showStarDecoration": s.config.ConsoleProject == "kubestellar",
+				"showAdopterNudge":   s.config.ConsoleProject == "kubestellar",
+				"showDemoToLocalCTA": s.config.ConsoleProject == "kubestellar",
+				"showRewards":        s.config.ConsoleProject == "kubestellar",
+				"showLinkedInShare":  s.config.ConsoleProject == "kubestellar",
+			},
 		}
 		if s.config.EnabledDashboards != "" {
+			// Explicit ENABLED_DASHBOARDS takes precedence over project presets
 			dashboards := strings.Split(s.config.EnabledDashboards, ",")
 			trimmed := make([]string, 0, len(dashboards))
 			for _, d := range dashboards {
@@ -379,6 +417,9 @@ func (s *Server) setupRoutes() {
 			if len(trimmed) > 0 {
 				resp["enabled_dashboards"] = trimmed
 			}
+		} else if presetDashboards := getProjectDashboards(s.config.ConsoleProject); presetDashboards != nil {
+			// Fall back to project preset dashboard list
+			resp["enabled_dashboards"] = presetDashboards
 		}
 		return c.JSON(resp)
 	})
@@ -1055,6 +1096,21 @@ func LoadConfigFromEnv() Config {
 		BenchmarkFolderID:          getEnvOrDefault("BENCHMARK_FOLDER_ID", "1r2Z2Xp1L0KonUlvQHvEzed8AO9Xj8IPm"),
 		// Sidebar dashboard filter
 		EnabledDashboards: os.Getenv("ENABLED_DASHBOARDS"),
+		// White-label project context
+		ConsoleProject: getEnvOrDefault("CONSOLE_PROJECT", "kubestellar"),
+		// White-label branding (all default to KubeStellar values)
+		BrandAppName:      getEnvOrDefault("APP_NAME", "KubeStellar Console"),
+		BrandAppShortName: getEnvOrDefault("APP_SHORT_NAME", "KubeStellar"),
+		BrandTagline:      getEnvOrDefault("APP_TAGLINE", "multi-cluster first, saving time and tokens"),
+		BrandLogoURL:      getEnvOrDefault("LOGO_URL", "/kubestellar-logo.svg"),
+		BrandFaviconURL:   getEnvOrDefault("FAVICON_URL", "/favicon.ico"),
+		BrandThemeColor:   getEnvOrDefault("THEME_COLOR", "#7c3aed"),
+		BrandDocsURL:      getEnvOrDefault("DOCS_URL", "https://kubestellar.io/docs/console/readme"),
+		BrandCommunityURL: getEnvOrDefault("COMMUNITY_URL", "https://kubestellar.io/community"),
+		BrandWebsiteURL:   getEnvOrDefault("WEBSITE_URL", "https://kubestellar.io"),
+		BrandIssuesURL:    getEnvOrDefault("ISSUES_URL", "https://github.com/kubestellar/kubestellar/issues/new"),
+		BrandRepoURL:      getEnvOrDefault("REPO_URL", "https://github.com/kubestellar/console"),
+		BrandHostedDomain: getEnvOrDefault("HOSTED_DOMAIN", "console.kubestellar.io"),
 		// Watchdog backend port override
 		BackendPort: backendPort,
 	}
