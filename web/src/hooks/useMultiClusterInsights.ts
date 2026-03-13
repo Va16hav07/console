@@ -26,17 +26,17 @@ import type { ClusterInfo } from './mcp/types'
 // ── Thresholds & Constants ────────────────────────────────────────────
 
 /** Minimum clusters with events in same window to trigger correlation */
-const MIN_CORRELATED_CLUSTERS = 2
+export const MIN_CORRELATED_CLUSTERS = 2
 /** Time window in ms for event correlation grouping (5 minutes) */
-const EVENT_CORRELATION_WINDOW_MS = 5 * 60 * 1000
+export const EVENT_CORRELATION_WINDOW_MS = 5 * 60 * 1000
 /** Time window in ms for cascade detection (15 minutes) */
-const CASCADE_DETECTION_WINDOW_MS = 15 * 60 * 1000
+export const CASCADE_DETECTION_WINDOW_MS = 15 * 60 * 1000
 /** CPU/memory utilization percentage threshold for resource imbalance */
 const RESOURCE_IMBALANCE_THRESHOLD_PCT = 30
 /** Pod restart count threshold for restart correlation */
-const RESTART_CORRELATION_THRESHOLD = 3
+export const RESTART_CORRELATION_THRESHOLD = 3
 /** Maximum number of insights per category */
-const MAX_INSIGHTS_PER_CATEGORY = 10
+export const MAX_INSIGHTS_PER_CATEGORY = 10
 /** Maximum number of top insights to return */
 const MAX_TOP_INSIGHTS = 5
 /** Percentage threshold for considering two values significantly different */
@@ -47,6 +47,14 @@ const DELTA_SIGNIFICANCE_MEDIUM_PCT = 20
 const INFRA_ISSUE_MIN_WORKLOADS = 3
 /** Minimum clusters in a horizontal restart pattern to flag app bug */
 const APP_BUG_MIN_CLUSTERS = 2
+/** CPU/memory utilization percentage above which severity escalates to critical */
+export const CPU_CRITICAL_THRESHOLD_PCT = 85
+/** Total restart count above which app-bug severity escalates to critical */
+export const RESTART_CRITICAL_THRESHOLD = 20
+/** Number of restarting workloads at which infra-issue severity escalates to critical */
+export const INFRA_CRITICAL_WORKLOADS = 5
+/** Number of clusters in a correlated event or cascade at which severity escalates to critical */
+export const CRITICAL_CLUSTER_THRESHOLD = 3
 
 /** Rollout per-cluster status indices (stored in metrics as ${cluster}_status): 0=pending, 1=in-progress, 2=complete, 3=failed */
 const ROLLOUT_STATUS_IN_PROGRESS = 1
@@ -66,7 +74,8 @@ const DEMO_OFFSET_15M_MS = 15 * 60 * 1000
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-function generateId(category: InsightCategory, ...parts: string[]): string {
+/** @internal Exported for testing */
+export function generateId(category: InsightCategory, ...parts: string[]): string {
   return `${category}:${parts.join(':')}`
 }
 
@@ -74,19 +83,22 @@ function now(): string {
   return new Date().toISOString()
 }
 
-function parseTimestamp(ts?: string): number {
+/** @internal Exported for testing */
+export function parseTimestamp(ts?: string): number {
   if (!ts) return 0
   return new Date(ts).getTime()
 }
 
-function pct(value: number | undefined, total: number | undefined): number {
+/** @internal Exported for testing */
+export function pct(value: number | undefined, total: number | undefined): number {
   if (!value || !total || total === 0) return 0
   return Math.round((value / total) * 100)
 }
 
 // ── Algorithm 1: Event Correlations ───────────────────────────────────
 
-function detectEventCorrelations(events: ClusterEvent[]): MultiClusterInsight[] {
+/** @internal Exported for testing */
+export function detectEventCorrelations(events: ClusterEvent[]): MultiClusterInsight[] {
   const warnings = (events || []).filter(e => e.type === 'Warning' && e.cluster && e.lastSeen)
   if (warnings.length === 0) return []
 
@@ -118,7 +130,7 @@ function detectEventCorrelations(events: ClusterEvent[]): MultiClusterInsight[] 
       id: generateId('event-correlation', String(bucket)),
       category: 'event-correlation',
       source: 'heuristic',
-      severity: clusterMap.size >= 3 ? 'critical' : 'warning',
+      severity: clusterMap.size >= CRITICAL_CLUSTER_THRESHOLD ? 'critical' : 'warning',
       title: `${clusterMap.size} clusters had simultaneous warnings`,
       description: `${totalEvents} warning events across ${affectedClusters.join(', ')} within a 5-minute window. Common reasons: ${reasons}.`,
       affectedClusters,
@@ -132,7 +144,8 @@ function detectEventCorrelations(events: ClusterEvent[]): MultiClusterInsight[] 
 
 // ── Algorithm 2: Cluster Deltas ───────────────────────────────────────
 
-function detectClusterDeltas(
+/** @internal Exported for testing */
+export function detectClusterDeltas(
   deployments: Deployment[],
   clusters: ClusterInfo[],
 ): MultiClusterInsight[] {
@@ -220,7 +233,8 @@ function detectClusterDeltas(
 
 // ── Algorithm 3: Cascade Impact ───────────────────────────────────────
 
-function detectCascadeImpact(events: ClusterEvent[]): MultiClusterInsight[] {
+/** @internal Exported for testing */
+export function detectCascadeImpact(events: ClusterEvent[]): MultiClusterInsight[] {
   const warnings = (events || [])
     .filter(e => e.type === 'Warning' && e.cluster && e.lastSeen)
     .sort((a, b) => parseTimestamp(a.lastSeen) - parseTimestamp(b.lastSeen))
@@ -267,7 +281,7 @@ function detectCascadeImpact(events: ClusterEvent[]): MultiClusterInsight[] {
         id: generateId('cascade-impact', String(baseTs)),
         category: 'cascade-impact',
         source: 'heuristic',
-        severity: chain.length >= 3 ? 'critical' : 'warning',
+        severity: chain.length >= CRITICAL_CLUSTER_THRESHOLD ? 'critical' : 'warning',
         title: `Possible cascade across ${chain.length} clusters`,
         description: `Issues started in ${chain[0].cluster} (${chain[0].event}) and spread to ${affectedClusters.slice(1).join(', ')} within ${Math.round(CASCADE_DETECTION_WINDOW_MS / 60000)} minutes.`,
         affectedClusters,
@@ -282,7 +296,8 @@ function detectCascadeImpact(events: ClusterEvent[]): MultiClusterInsight[] {
 
 // ── Algorithm 4: Config Drift ─────────────────────────────────────────
 
-function detectConfigDrift(deployments: Deployment[]): MultiClusterInsight[] {
+/** @internal Exported for testing */
+export function detectConfigDrift(deployments: Deployment[]): MultiClusterInsight[] {
   if ((deployments || []).length === 0) return []
 
   // Group by name+namespace
@@ -327,7 +342,8 @@ function detectConfigDrift(deployments: Deployment[]): MultiClusterInsight[] {
 
 // ── Algorithm 5: Resource Imbalance ───────────────────────────────────
 
-function detectResourceImbalance(clusters: ClusterInfo[]): MultiClusterInsight[] {
+/** @internal Exported for testing */
+export function detectResourceImbalance(clusters: ClusterInfo[]): MultiClusterInsight[] {
   const healthy = (clusters || []).filter(c => c.healthy !== false && c.cpuCores && c.cpuCores > 0)
   if (healthy.length < 2) return []
 
@@ -358,7 +374,7 @@ function detectResourceImbalance(clusters: ClusterInfo[]): MultiClusterInsight[]
       id: generateId('resource-imbalance', 'cpu'),
       category: 'resource-imbalance',
       source: 'heuristic',
-      severity: overloaded.some(c => c.pct > 85) ? 'critical' : 'warning',
+      severity: overloaded.some(c => c.pct > CPU_CRITICAL_THRESHOLD_PCT) ? 'critical' : 'warning',
       title: `CPU imbalance across fleet (avg ${Math.round(avgCpu)}%)`,
       description: `${parts.join('; ')}. Fleet average: ${Math.round(avgCpu)}%.`,
       affectedClusters: [...overloaded, ...underloaded].map(c => c.name),
@@ -388,7 +404,7 @@ function detectResourceImbalance(clusters: ClusterInfo[]): MultiClusterInsight[]
         id: generateId('resource-imbalance', 'memory'),
         category: 'resource-imbalance',
         source: 'heuristic',
-        severity: memOverloaded.some(c => c.pct > 85) ? 'critical' : 'warning',
+        severity: memOverloaded.some(c => c.pct > CPU_CRITICAL_THRESHOLD_PCT) ? 'critical' : 'warning',
         title: `Memory imbalance across fleet (avg ${Math.round(avgMem)}%)`,
         description: `Memory utilization ranges from ${Math.min(...memPcts.map(c => c.pct))}% to ${Math.max(...memPcts.map(c => c.pct))}%. Fleet average: ${Math.round(avgMem)}%.`,
         affectedClusters: [...memOverloaded, ...memUnderloaded].map(c => c.name),
@@ -403,7 +419,8 @@ function detectResourceImbalance(clusters: ClusterInfo[]): MultiClusterInsight[]
 
 // ── Algorithm 6: Restart Correlation ──────────────────────────────────
 
-function detectRestartCorrelation(podIssues: PodIssue[]): MultiClusterInsight[] {
+/** @internal Exported for testing */
+export function detectRestartCorrelation(podIssues: PodIssue[]): MultiClusterInsight[] {
   const issues = (podIssues || []).filter(p => p.restarts >= RESTART_CORRELATION_THRESHOLD && p.cluster)
   if (issues.length === 0) return []
 
@@ -434,7 +451,7 @@ function detectRestartCorrelation(podIssues: PodIssue[]): MultiClusterInsight[] 
         id: generateId('restart-correlation', 'app-bug', workload),
         category: 'restart-correlation',
         source: 'heuristic',
-        severity: totalRestarts > 20 ? 'critical' : 'warning',
+        severity: totalRestarts > RESTART_CRITICAL_THRESHOLD ? 'critical' : 'warning',
         title: `${workload} restarting across ${clusterMap.size} clusters (likely app bug)`,
         description: `${workload} has ${totalRestarts} total restarts across ${affectedClusters.join(', ')}. Same workload failing everywhere suggests an application-level issue.`,
         affectedClusters,
@@ -459,7 +476,7 @@ function detectRestartCorrelation(podIssues: PodIssue[]): MultiClusterInsight[] 
         id: generateId('restart-correlation', 'infra-issue', cluster),
         category: 'restart-correlation',
         source: 'heuristic',
-        severity: workloads.size >= 5 ? 'critical' : 'warning',
+        severity: workloads.size >= INFRA_CRITICAL_WORKLOADS ? 'critical' : 'warning',
         title: `${workloads.size} workloads restarting in ${cluster} (likely infra issue)`,
         description: `Multiple different workloads (${Array.from(workloads).slice(0, 5).join(', ')}) are restarting in ${cluster}. This pattern suggests an infrastructure problem rather than an application bug.`,
         affectedClusters: [cluster],
@@ -474,7 +491,8 @@ function detectRestartCorrelation(podIssues: PodIssue[]): MultiClusterInsight[] 
 
 // ── Algorithm 7: Rollout Tracking ─────────────────────────────────────
 
-function trackRolloutProgress(deployments: Deployment[]): MultiClusterInsight[] {
+/** @internal Exported for testing */
+export function trackRolloutProgress(deployments: Deployment[]): MultiClusterInsight[] {
   if ((deployments || []).length === 0) return []
 
   // Group by name+namespace
