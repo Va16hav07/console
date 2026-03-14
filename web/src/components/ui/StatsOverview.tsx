@@ -212,7 +212,7 @@ function StatBlock({ block, data, hasData, isLoading, history, onDisplayModeChan
         </>
       ) : effectiveMode === 'ring' && !isNaN(numericValue) ? (
         <>
-          <div className="flex items-center gap-3">
+          <div className="flex justify-center">
             <CircularProgress
               value={numericValue}
               max={maxValue}
@@ -220,13 +220,8 @@ function StatBlock({ block, data, hasData, isLoading, history, onDisplayModeChan
               strokeWidth={RING_STROKE_PX}
               color={hexColor}
             />
-            <div>
-              <div className={`text-2xl font-bold ${isLoading ? 'text-muted-foreground/30' : valueColor}`}>
-                {displayValue}
-              </div>
-              {data.sublabel && <div className="text-xs text-muted-foreground">{data.sublabel}</div>}
-            </div>
           </div>
+          {data.sublabel && <div className="text-xs text-muted-foreground text-center mt-1">{data.sublabel}</div>}
         </>
       ) : effectiveMode === 'mini-bar' && !isNaN(numericValue) ? (
         <>
