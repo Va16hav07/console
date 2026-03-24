@@ -46,7 +46,17 @@ DO NOT PUSH CODE THAT FAILS BUILD OR LINT. This is non-negotiable.
 
 ## PR Requirements
 
-- Include `Fixes #ISSUE_NUMBER` in PR body
+### MANDATORY: Link PR to Issue
+
+**The FIRST LINE of every PR body MUST be `Fixes #ISSUE_NUMBER`** where ISSUE_NUMBER is the issue you were assigned to fix. This is required so GitHub automatically closes the issue when the PR is merged.
+
+Example — if you are fixing issue #3400, the PR body must start with:
+```
+Fixes #3400
+```
+
+Do NOT omit this. Do NOT put it at the end. It MUST be the first line.
+
 - All commits must pass build and lint
 - Keep changes focused on the issue
 
