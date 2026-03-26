@@ -8,7 +8,13 @@ interface AgentIconProps {
 
 export function AgentIcon({ provider, className = 'w-5 h-5' }: AgentIconProps) {
   const { t: _t } = useTranslation()
-  switch (provider) {
+  // Normalize agent name aliases to their canonical provider key so icons
+  // are consistent whether callers pass the agent name or the provider key.
+  const normalizedProvider: AgentProvider | string =
+    provider === 'goose' ? 'block' :
+    provider === 'copilot-cli' ? 'github-cli' :
+    provider
+  switch (normalizedProvider) {
     case 'anthropic':
       return (
         <svg className={className} viewBox="0 0 24 24" fill="currentColor">

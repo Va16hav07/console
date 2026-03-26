@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -33,12 +34,15 @@ func (g *GooseProvider) detectCLI() {
 	}
 
 	// Check common installation paths
-	home, _ := os.UserHomeDir()
-	paths := []string{
-		filepath.Join(home, ".local", "bin", "goose"),
-		filepath.Join(home, ".goose", "bin", "goose"),
-		"/usr/local/bin/goose",
+	home, err := os.UserHomeDir()
+	paths := []string{}
+	if err == nil && home != "" {
+		paths = append(paths,
+			filepath.Join(home, ".local", "bin", "goose"),
+			filepath.Join(home, ".goose", "bin", "goose"),
+		)
 	}
+	paths = append(paths, "/usr/local/bin/goose")
 
 	// Homebrew paths (macOS)
 	for _, prefix := range []string{"/opt/homebrew", "/usr/local"} {
@@ -118,9 +122,24 @@ func (g *GooseProvider) StreamChat(ctx context.Context, req *ChatRequest, onChun
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start goose: %w", err)
 	}
+
+	// Drain stderr in background to prevent pipe-buffer deadlocks.
+	var stderrBuf strings.Builder
+	stderrDone := make(chan struct{})
+	go func() {
+		defer close(stderrDone)
+		if _, copyErr := io.Copy(&stderrBuf, stderr); copyErr != nil {
+			log.Printf("[Goose] Error reading stderr: %v", copyErr)
+		}
+	}()
 
 	var fullResponse strings.Builder
 	scanner := bufio.NewScanner(stdout)
@@ -133,9 +152,22 @@ func (g *GooseProvider) StreamChat(ctx context.Context, req *ChatRequest, onChun
 			onChunk(line + "\n")
 		}
 	}
+	if scanErr := scanner.Err(); scanErr != nil {
+		log.Printf("[Goose] Scanner error: %v", scanErr)
+	}
 
-	if err := cmd.Wait(); err != nil {
-		log.Printf("[Goose] Command finished with error: %v", err)
+	// Wait for stderr drain before calling cmd.Wait.
+	<-stderrDone
+
+	if waitErr := cmd.Wait(); waitErr != nil {
+		if fullResponse.Len() == 0 {
+			stderrStr := strings.TrimSpace(stderrBuf.String())
+			if stderrStr != "" {
+				return nil, fmt.Errorf("goose exited with error: %w; stderr: %s", waitErr, stderrStr)
+			}
+			return nil, fmt.Errorf("goose exited with error: %w", waitErr)
+		}
+		log.Printf("[Goose] Command finished with error: %v", waitErr)
 	}
 
 	return &ChatResponse{

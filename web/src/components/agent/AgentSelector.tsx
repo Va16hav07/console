@@ -14,6 +14,7 @@ import { safeGetItem, safeSetItem } from '../../lib/utils/localStorage'
 import { AgentApprovalDialog, hasApprovedAgents } from './AgentApprovalDialog'
 import { MissionDetailView } from '../missions/MissionDetailView'
 import { ClusterSelectionDialog } from '../missions/ClusterSelectionDialog'
+import { CLUSTER_PROVIDER_KEYS, buildVisibleAgents, sectionAgents } from './agentSelectorUtils'
 
 interface AgentSelectorProps {
   compact?: boolean
@@ -45,7 +46,7 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
   const [pendingInstall, setPendingInstall] = useState<{ missionId: string; displayName: string; mission: MissionExport } | null>(null)
 
   // Providers that are cluster-based (rendered in bottom section)
-  const CLUSTER_PROVIDERS: Set<AgentProvider> = useMemo(() => new Set(['kagent', 'kagenti'] as AgentProvider[]), [])
+  const CLUSTER_PROVIDERS: Set<AgentProvider> = useMemo(() => new Set(CLUSTER_PROVIDER_KEYS), [])
 
   // Always-show CLI agents (appear grayed out when not detected)
   const ALWAYS_SHOW_CLI: AgentInfo[] = useMemo(() => [
@@ -68,38 +69,10 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
   ], [])
 
   // Merge local agents with always-show CLI agents and in-cluster backends
-  const visibleAgents = useMemo(() => {
-    // Start with all agents from backend; hide Bob unless detected
-    const merged = agents.filter(a => a.name !== 'bob' || a.available)
-
-    // Add always-show CLI agents if not already present from backend
-    for (const stub of ALWAYS_SHOW_CLI) {
-      if (!merged.some(a => a.name === stub.name || a.provider === stub.provider)) {
-        merged.push(stub)
-      }
-    }
-
-    // Add in-cluster backends
-    const inCluster: AgentInfo[] = [
-      {
-        name: 'kagenti',
-        displayName: selectedKagentiAgent ? `Kagenti (${selectedKagentiAgent.name})` : 'Kagenti',
-        description: kagentiAvailable ? 'In-cluster AI agent via kagenti' : 'Install kagenti for in-cluster AI agents',
-        provider: 'kagenti',
-        available: kagentiAvailable,
-        installMissionId: kagentiAvailable ? undefined : 'install-kagenti',
-      },
-      {
-        name: 'kagent',
-        displayName: selectedKagentAgent ? `Kagent (${selectedKagentAgent.name})` : 'Kagent',
-        description: kagentAvailable ? 'In-cluster AI agent via kagent' : 'Install kagent for in-cluster AI agents',
-        provider: 'kagent',
-        available: kagentAvailable,
-        installMissionId: kagentAvailable ? undefined : 'install-kagent',
-      },
-    ]
-    return [...merged, ...inCluster]
-  }, [agents, ALWAYS_SHOW_CLI, kagentAvailable, kagentiAvailable, selectedKagentAgent, selectedKagentiAgent])
+  const visibleAgents = useMemo(() =>
+    buildVisibleAgents(agents, ALWAYS_SHOW_CLI, { kagentAvailable, kagentiAvailable, selectedKagentAgent, selectedKagentiAgent }),
+    [agents, ALWAYS_SHOW_CLI, kagentAvailable, kagentiAvailable, selectedKagentAgent, selectedKagentiAgent]
+  )
 
   // Check if any CLI agent is available (can run install missions)
   const hasCliAgent = useMemo(() => agents.some(a => a.available), [agents])
@@ -176,27 +149,10 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
   }, [closeDropdown, startMission])
 
   // Split agents into sections: selected at top, then CLI, then Cluster
-  const { selectedAgentInfo, cliAgents, clusterAgents } = useMemo(() => {
-    const sectionSort = (a: AgentInfo, b: AgentInfo) => {
-      if (a.available && !b.available) return -1
-      if (!a.available && b.available) return 1
-      return a.displayName.localeCompare(b.displayName)
-    }
-
-    const selected = visibleAgents.find(a => a.name === selectedAgent) || null
-    const rest = visibleAgents.filter(a => a.name !== selectedAgent)
-
-    const cli = rest.filter(a => !CLUSTER_PROVIDERS.has(a.provider as AgentProvider)).sort(sectionSort)
-    const cluster = rest.filter(a => CLUSTER_PROVIDERS.has(a.provider as AgentProvider)).sort((a, b) => {
-      if (a.available && !b.available) return -1
-      if (!a.available && b.available) return 1
-      if (a.provider === 'kagenti' && b.provider === 'kagent') return -1
-      if (a.provider === 'kagent' && b.provider === 'kagenti') return 1
-      return a.displayName.localeCompare(b.displayName)
-    })
-
-    return { selectedAgentInfo: selected, cliAgents: cli, clusterAgents: cluster }
-  }, [visibleAgents, selectedAgent, CLUSTER_PROVIDERS])
+  const { selectedAgentInfo, cliAgents, clusterAgents } = useMemo(() =>
+    sectionAgents(visibleAgents, selectedAgent, CLUSTER_PROVIDERS),
+    [visibleAgents, selectedAgent, CLUSTER_PROVIDERS]
+  )
 
   // Flat list for keyboard navigation and length checks
   const sortedAgents = useMemo(() => {
