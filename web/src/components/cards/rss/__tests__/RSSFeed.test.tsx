@@ -73,7 +73,6 @@ vi.mock('../../../../lib/cards/cardHooks', () => ({
 }))
 
 vi.mock('../../CardDataContext', () => ({
-  useCardLoadingState: () => ({ data: [], isLoading: false, error: null }),
   useCardLoadingState: () => ({ showSkeleton: false, showEmptyState: false, hasData: true, isRefreshing: false }),
 }))
 
@@ -81,7 +80,7 @@ import { RSSFeed } from '../RSSFeed'
 
 describe('RSSFeed', () => {
   it('renders without crashing', () => {
-    const { container } = render(<RSSFeed/ />)
+    const { container } = render(<RSSFeed />)
     expect(container).toBeTruthy()
   })
 })

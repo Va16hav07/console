@@ -23,7 +23,6 @@ describe('useDiagnoseRepairLoop', () => {
   it('returns expected shape', () => {
     const { result } = renderHook(() => useDiagnoseRepairLoop({ monitorType: 'pod-crash' }))
     expect(result.current).toHaveProperty('state')
-    expect(result.current).toHaveProperty('startDiagnose')
-    expect(result.current).toHaveProperty('reset')
+    expect(result.current.state.phase).toBe('idle')
   })
 })

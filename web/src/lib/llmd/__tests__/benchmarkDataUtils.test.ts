@@ -366,9 +366,49 @@ describe('buildHeatmapData', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// CONFIG_TYPE_COLORS
-// ---------------------------------------------------------------------------
+describe('getFilterOptions', () => {
+  const makeFilterReport = (eid: string) => ({
+    run: { eid },
+    scenario: {
+      stack: [],
+      load: { standardized: { rate_qps: 10, input_seq_len: { value: 100 }, output_seq_len: { value: 50 } } },
+    },
+    results: {
+      request_performance: {
+        aggregate: {
+          latency: {},
+          throughput: {},
+          requests: { total: 10, failures: 0 },
+        },
+      },
+    },
+  })
+
+  it('returns empty arrays for empty input', () => {
+    const opts = getFilterOptions([])
+    expect(opts.categories).toEqual([])
+  })
+
+  it('extracts unique categories', () => {
+    const reports = [
+      makeFilterReport('Cat A/var1'),
+      makeFilterReport('Cat A/var2'),
+      makeFilterReport('Cat B/var3'),
+    ]
+    const opts = getFilterOptions(reports as Parameters<typeof getFilterOptions>[0])
+    expect(opts.categories).toContain('Cat A')
+    expect(opts.categories).toContain('Cat B')
+    expect(opts.categories.length).toBe(2)
+  })
+})
+
+describe('buildHeatmapData', () => {
+  it('returns object for empty input', () => {
+    const result = buildHeatmapData([])
+    expect(result).toBeDefined()
+  })
+})
+
 describe('CONFIG_TYPE_COLORS', () => {
   it('has colors for standalone, disaggregated, scheduling', () => {
     expect(CONFIG_TYPE_COLORS).toHaveProperty('standalone')

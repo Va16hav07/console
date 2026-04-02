@@ -102,6 +102,7 @@ describe('sseClient', () => {
 
       const result = await fetchSSE({
         url: `/api/mcp/pods/stream-${testId++}`,
+        url: '/api/mcp/pods/stream',
         itemsKey: 'pods',
         onClusterData: (cluster, items) => {
           clusterDataCalls.push({ cluster, items })
@@ -122,6 +123,7 @@ describe('sseClient', () => {
 
       await fetchSSE({
         url: `/api/auth-${testId++}`,
+        url: '/api/test',
         itemsKey: 'items',
         onClusterData: vi.fn(),
       })
@@ -138,6 +140,7 @@ describe('sseClient', () => {
 
       await fetchSSE({
         url: `/api/params-${testId++}`,
+        url: '/api/test',
         params: { namespace: 'default', limit: 100 },
         itemsKey: 'items',
         onClusterData: vi.fn(),
@@ -157,6 +160,7 @@ describe('sseClient', () => {
 
       await fetchSSE({
         url: `/api/ondone-${testId++}`,
+        url: '/api/test',
         itemsKey: 'items',
         onClusterData: vi.fn(),
         onDone,
@@ -218,6 +222,7 @@ describe('sseClient', () => {
 
       await fetchSSE({
         url: `/api/undef-params-${testId++}`,
+        url: '/api/test',
         params: { namespace: 'default', cluster: undefined },
         itemsKey: 'items',
         onClusterData: vi.fn(),
@@ -585,5 +590,4 @@ describe('sseClient', () => {
       expect(url).toContain('page=3')
     })
   })
-})
 })
