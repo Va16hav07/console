@@ -53,10 +53,56 @@ jobs:
         run: npm ci
 
       - name: Run shard ${{ matrix.shard }}/${{ env.TOTAL_SHARDS }} with coverage
+        id: test
         working-directory: web
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
-        run: npx vitest run --coverage --coverage.reportOnFailure --shard=${{ matrix.shard }}/${{ env.TOTAL_SHARDS }}
+        run: |
+          npx vitest run --coverage --coverage.reportOnFailure \
+            --reporter=default --reporter=json \
+            --outputFile.json=test-results.json \
+            --shard=${{ matrix.shard }}/${{ env.TOTAL_SHARDS }} || true
+
+          # Extract failed test names for the issue body
+          if [ -f test-results.json ]; then
+            node -e "
+              const r = require('./test-results.json');
+              const failed = [];
+              for (const suite of r.testResults || []) {
+                for (const t of suite.assertionResults || []) {
+                  if (t.status === 'failed') {
+                    const file = suite.name.replace(/.*\/web\//, '');
+                    failed.push(file + ' > ' + t.fullName);
+                  }
+                }
+                // Also flag suites that failed to load (0 assertions = parse error)
+                if (suite.status === 'failed' && (!suite.assertionResults || suite.assertionResults.length === 0)) {
+                  const file = suite.name.replace(/.*\/web\//, '');
+                  failed.push(file + ' (failed to load)');
+                }
+              }
+              require('fs').writeFileSync('failed-tests.txt', failed.join('\n'));
+              if (failed.length > 0) {
+                console.log('Failed tests in shard ${{ matrix.shard }}:');
+                failed.forEach(f => console.log('  ❌ ' + f));
+                process.exit(1);
+              } else {
+                console.log('All tests passed in shard ${{ matrix.shard }}');
+              }
+            "
+          else
+            echo "No test results JSON found"
+            exit 1
+          fi
+
+      - name: Upload failed test list
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-tests-${{ matrix.shard }}
+          path: web/failed-tests.txt
+          if-no-files-found: ignore
+          retention-days: 1
 
       - name: Upload shard coverage
         if: always()
@@ -103,6 +149,50 @@ jobs:
         with:
           pattern: coverage-shard-*
           path: /tmp/shards
+
+      - name: Download failed test artifacts
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          pattern: failed-tests-*
+          path: /tmp/failed-tests
+
+      - name: Collect failed test lists from all shards
+        id: failures
+        run: |
+          FAILED=""
+          for dir in /tmp/failed-tests/failed-tests-*; do
+            if [ -f "$dir/failed-tests.txt" ]; then
+              content=$(cat "$dir/failed-tests.txt")
+              if [ -n "$content" ]; then
+                FAILED="${FAILED}${content}"$'\n'
+              fi
+            fi
+          done
+
+          # Deduplicate and count
+          if [ -n "$FAILED" ]; then
+            UNIQUE=$(echo "$FAILED" | sort -u | grep -v '^$')
+            COUNT=$(echo "$UNIQUE" | wc -l | tr -d ' ')
+            echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+
+            # Store as multiline output (truncate at 30 to keep issue readable)
+            DISPLAY=$(echo "$UNIQUE" | head -30)
+            REMAINING=$((COUNT - 30))
+            if [ "$REMAINING" -gt 0 ]; then
+              DISPLAY="${DISPLAY}"$'\n'"_...and ${REMAINING} more_"
+            fi
+            # Use delimiter for multiline
+            EOF_MARKER=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "list<<${EOF_MARKER}" >> "$GITHUB_OUTPUT"
+            echo "$DISPLAY" >> "$GITHUB_OUTPUT"
+            echo "${EOF_MARKER}" >> "$GITHUB_OUTPUT"
+
+            echo "::warning::${COUNT} test(s) failed across shards"
+          else
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            echo "list=" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Merge coverage and generate summary
         id: cov
@@ -279,6 +369,9 @@ jobs:
       - name: Open issue for test failures
         if: needs.test-shard.result == 'failure'
         uses: actions/github-script@v7
+        env:
+          FAILED_TESTS: ${{ steps.failures.outputs.list }}
+          FAILED_COUNT: ${{ steps.failures.outputs.count }}
         with:
           github-token: ${{ secrets.GIST_TOKEN }}
           script: |
@@ -286,6 +379,8 @@ jobs:
             const sha = context.sha;
             const shortSha = sha.substring(0, 7);
             const commitUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/commit/${sha}`;
+            const failedTests = process.env.FAILED_TESTS || '';
+            const failedCount = parseInt(process.env.FAILED_COUNT) || 0;
 
             // Find the PR that introduced this commit
             let prInfo = '';
@@ -311,6 +406,19 @@ jobs:
               prInfo,
             ].filter(Boolean).join('\n');
 
+            // Build the failing tests section
+            let failedSection = '';
+            if (failedTests.trim()) {
+              const lines = failedTests.trim().split('\n').map(l => `- \`${l}\``).join('\n');
+              failedSection = [
+                `### Failing tests (${failedCount})`,
+                ``,
+                lines,
+              ].join('\n');
+            } else {
+              failedSection = `### Failing tests\n\n_Could not extract test names. Check the [run logs](${runUrl})._`;
+            }
+
             // Check if there's already an open test-failure issue to avoid duplicates
             const ISSUE_LABEL = 'test-failure';
             const existing = await github.rest.issues.listForRepo({
@@ -322,38 +430,41 @@ jobs:
             });
 
             if (existing.data.length > 0) {
-              // Add a comment to the existing issue with blame info
+              // Add a comment to the existing issue with blame info + failing tests
               const issue = existing.data[0];
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
                 body: [
-                  `Coverage Suite run [#${context.runNumber}](${runUrl}) also had test failures.`,
+                  `Coverage Suite run [#${context.runNumber}](${runUrl}) — **${failedCount} test(s) failed**`,
                   ``,
                   blameSection,
+                  ``,
+                  failedSection,
                 ].join('\n'),
               });
               console.log(`Commented on existing issue #${issue.number}`);
             } else {
-              // Create a new issue with blame info
+              // Create a new issue with blame info + failing tests
               await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                title: `🐛 Test failures in Coverage Suite run #${context.runNumber}`,
+                title: `🐛 ${failedCount} test failure(s) in Coverage Suite run #${context.runNumber}`,
                 body: [
                   `## Test Failures Detected`,
                   ``,
-                  `One or more test shards failed in the [Coverage Suite run #${context.runNumber}](${runUrl}).`,
+                  `**${failedCount} test(s)** failed in the [Coverage Suite run #${context.runNumber}](${runUrl}).`,
                   ``,
                   blameSection,
+                  ``,
+                  failedSection,
                   ``,
                   `Coverage was still merged and the badge updated (currently **${{ steps.cov.outputs.pct }}%**), but the failing tests need attention.`,
                   ``,
                   `### Action needed`,
-                  `1. Check the [run logs](${runUrl}) for failing test files`,
-                  `2. Determine if failures are test updates needed or potential regressions`,
-                  `3. Fix and close this issue`,
+                  `1. For each failing test, determine if it's a **test update needed** or a **potential regression**`,
+                  `2. Fix and close this issue`,
                   ``,
                   `_Auto-generated by Coverage Suite workflow_`,
                 ].join('\n'),
