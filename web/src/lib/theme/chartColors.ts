@@ -1,7 +1,7 @@
 /**
  * Shared chart color constants for visualization components.
  *
- * Charting libraries (recharts, echarts, canvas) require raw hex values —
+ * Charting libraries (echarts, canvas) require raw hex values —
  * Tailwind classes don't work — so we centralize them here as named
  * constants to keep the codebase consistent and satisfy the ui-ux-standard
  * ratchet.

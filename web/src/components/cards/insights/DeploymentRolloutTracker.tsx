@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Rocket, CheckCircle2, AlertTriangle, Clock, ChevronRight } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import ReactECharts from 'echarts-for-react'
 import { useMultiClusterInsights } from '../../../hooks/useMultiClusterInsights'
 import { useCardLoadingState } from '../CardDataContext'
 import { useGlobalFilters } from '../../../hooks/useGlobalFilters'
@@ -80,6 +80,43 @@ export function DeploymentRolloutTracker() {
     })
   })()
 
+  const chartOption = useMemo(() => {
+    if (clusterProgress.length === 0) return {}
+    return {
+      backgroundColor: 'transparent',
+      grid: { left: 85, right: 10, top: 5, bottom: 20 },
+      xAxis: {
+        type: 'value' as const,
+        min: 0,
+        max: FULL_PROGRESS_PCT,
+        axisLabel: { fontSize: 9, color: CHART_TICK_COLOR, formatter: (v: number) => `${v}%` },
+        axisTick: { show: false },
+        axisLine: { show: false },
+        splitLine: { lineStyle: { color: CHART_GRID_STROKE, type: 'dashed' as const } },
+      },
+      yAxis: {
+        type: 'category' as const,
+        data: clusterProgress.map(c => c.cluster),
+        axisLabel: { fontSize: 9, color: CHART_TICK_COLOR },
+        axisTick: { show: false },
+        axisLine: { show: false },
+      },
+      tooltip: {
+        backgroundColor: (CHART_TOOLTIP_CONTENT_STYLE as Record<string, unknown>).backgroundColor as string,
+        borderColor: (CHART_TOOLTIP_CONTENT_STYLE as Record<string, unknown>).borderColor as string,
+        textStyle: { color: '#e0e0e0', fontSize: Number(CHART_TOOLTIP_FONT_SIZE_COMPACT.replace('px', '')) },
+        formatter: (params: { name: string; value: number }) => `${params.name}: ${params.value}%`,
+      },
+      series: [{
+        type: 'bar',
+        data: clusterProgress.map(c => ({
+          value: c.progress,
+          itemStyle: { color: getProgressColor(c.status), borderRadius: [0, 4, 4, 0] },
+        })),
+      }],
+    }
+  }, [clusterProgress])
+
   if (!isLoading && rolloutInsightsRaw.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-8">
@@ -139,36 +176,12 @@ export function DeploymentRolloutTracker() {
           {/* Per-cluster progress chart */}
           {clusterProgress.length > 0 && (
             <div className="h-32">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={clusterProgress}
-                  layout="vertical"
-                  margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
-                  <XAxis
-                    type="number"
-                    domain={[0, FULL_PROGRESS_PCT]}
-                    tick={{ fontSize: 9, fill: CHART_TICK_COLOR }}
-                    tickFormatter={v => `${v}%`}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="cluster"
-                    tick={{ fontSize: 9, fill: CHART_TICK_COLOR }}
-                    width={80}
-                  />
-                  <Tooltip
-                    contentStyle={{ ...CHART_TOOLTIP_CONTENT_STYLE, fontSize: CHART_TOOLTIP_FONT_SIZE_COMPACT }}
-                    formatter={((value: number) => [`${value}%`, 'Progress']) as never}
-                  />
-                  <Bar dataKey="progress" radius={[0, 4, 4, 0]}>
-                    {(clusterProgress || []).map((entry, idx) => (
-                      <Cell key={`cell-${idx}`} fill={getProgressColor(entry.status)} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={chartOption}
+                style={{ height: 128, width: '100%' }}
+                notMerge={true}
+                opts={{ renderer: 'svg' }}
+              />
             </div>
           )}
 

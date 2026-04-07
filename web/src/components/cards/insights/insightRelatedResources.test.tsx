@@ -79,15 +79,8 @@ vi.mock('../../../hooks/useGlobalFilters', () => ({
     filterBySeverity: (items: unknown[]) => items,
   }),
 }))
-vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Bar: () => <div />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
-  CartesianGrid: () => <div />,
-  Tooltip: () => <div />,
-  Cell: () => <div />,
+vi.mock('echarts-for-react', () => ({
+  default: () => <div data-testid="echarts-mock" />,
 }))
 
 import { useMultiClusterInsights } from '../../../hooks/useMultiClusterInsights'

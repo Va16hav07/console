@@ -32,11 +32,6 @@ const DEFAULT_COLORS = [
   '#ec4899',
 ]
 
-/** Minimum treemap cell width (px) to show label text */
-const MIN_LABEL_CELL_WIDTH = 40
-/** Minimum treemap cell height (px) to show label text */
-const MIN_LABEL_CELL_HEIGHT = 30
-
 export function TreeMap({
   data,
   height = 200,
