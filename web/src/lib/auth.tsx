@@ -412,7 +412,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // instead of flashing through the login page.
   useEffect(() => {
     refreshUser().finally(() => setIsLoading(false))
-  }, [refreshUser])
+  // eslint-disable-next-line react-hooks/exhaustive-deps — run once on mount
+  }, [])
 
   return (
     <AuthContext.Provider
