@@ -150,8 +150,8 @@ export const POLL_INTERVAL_MS = 30_000
 /** Slow polling interval for less time-sensitive data (60 seconds) */
 export const POLL_INTERVAL_SLOW_MS = 60_000
 
-/** Fast polling interval for real-time metrics (10 seconds) */
-export const POLL_INTERVAL_FAST_MS = 10_000
+/** Fast polling interval for real-time metrics (2 seconds) */
+export const POLL_INTERVAL_FAST_MS = 2_000
 
 /** Update interval for elapsed time counters (1 second) */
 export const TICK_INTERVAL_MS = 1_000
@@ -221,8 +221,8 @@ export const NAMESPACE_ABORT_TIMEOUT_MS = 8_000
 /** Abort timeout for deploy mission operations (10 seconds) */
 export const DEPLOY_ABORT_TIMEOUT_MS = 10_000
 
-/** KV cache stats update interval (15 seconds) */
-export const KV_CACHE_UPDATE_INTERVAL_MS = 15_000
+/** KV cache stats update interval (3 seconds) */
+export const KV_CACHE_UPDATE_INTERVAL_MS = 3_000
 
 /** Animation packet spawn interval (800ms) */
 export const PACKET_SPAWN_INTERVAL_MS = 800

@@ -3,18 +3,7 @@ import { TrendingUp, Clock, Server } from 'lucide-react'
 import { CardClusterFilter } from '../../lib/cards/CardComponents'
 import { Skeleton, SkeletonStats } from '../ui/Skeleton'
 import { useCardLoadingState } from './CardDataContext'
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  PieChart,
-  Pie,
-  ReferenceLine } from 'recharts'
+import ReactECharts from 'echarts-for-react'
 import { useClusters } from '../../hooks/useMCP'
 import { useCachedGPUNodes } from '../../hooks/useCachedData'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
@@ -55,12 +44,10 @@ export function GPUUtilization() {
   const { deduplicatedClusters: clusters } = useClusters()
   const { isDemoMode } = useDemoMode()
 
-  // Only show skeleton when no cached data exists
   const hasData = gpuNodes.length > 0
   const isLoading = hookLoading && !hasData
   const { selectedClusters, isAllClustersSelected } = useGlobalFilters()
 
-  // Report loading state to CardWrapper for skeleton/refresh behavior
   useCardLoadingState({
     isLoading: hookLoading && !hasData,
     isRefreshing,
@@ -73,16 +60,12 @@ export function GPUUtilization() {
   const [showClusterFilter, setShowClusterFilter] = useState(false)
   const clusterFilterRef = useRef<HTMLDivElement>(null)
 
-  // Get reachable clusters
   const reachableClusters = clusters.filter(c => c.reachable !== false)
-
-  // Get available clusters for local filter (respects global filter)
   const availableClustersForFilter = (() => {
     if (isAllClustersSelected) return reachableClusters
     return reachableClusters.filter(c => selectedClusters.includes(c.name))
   })()
 
-  // Filter by selected clusters AND local filter AND exclude offline/unreachable clusters
   const filteredClusters = (() => {
     let filtered = reachableClusters
     if (!isAllClustersSelected) {
@@ -103,34 +86,26 @@ export function GPUUtilization() {
     })
   }
 
-  // Get names of reachable clusters for node filtering
   const reachableClusterNames = new Set(clusters.filter(c => c.reachable !== false).map(c => c.name))
-
   const hasReachableClusters = filteredClusters.some(c => c.nodeCount !== undefined && c.nodeCount > 0)
 
-  // Track historical data points
   const historyRef = useRef<GPUPoint[]>([])
   const [history, setHistory] = useState<GPUPoint[]>([])
 
-  // Filter by selected clusters AND local filter AND exclude nodes from offline/unreachable clusters
   const filteredNodes = (() => {
-    // First filter to only nodes from reachable clusters
     let result = gpuNodes.filter(n => {
-      // Match using full name or last segment (handles "namespace/cluster-name" format)
       const lastPart = n.cluster.split('/').pop() ?? n.cluster
       return reachableClusterNames.has(n.cluster) || reachableClusterNames.has(lastPart)
     })
     if (!isAllClustersSelected) {
       result = result.filter(n => selectedClusters.some(c => n.cluster.startsWith(c)))
     }
-    // Apply local cluster filter
     if (localClusterFilter.length > 0) {
       result = result.filter(n => localClusterFilter.some(c => n.cluster.startsWith(c)))
     }
     return result
   })()
 
-  // Calculate current stats
   const currentStats = useMemo(() => {
     const total = filteredNodes.reduce((sum, n) => sum + n.gpuCount, 0)
     const allocated = filteredNodes.reduce((sum, n) => sum + n.gpuAllocated, 0)
@@ -139,24 +114,19 @@ export function GPUUtilization() {
     return { total, allocated, available, utilization }
   }, [filteredNodes])
 
-  // Add data point to history on each update
   useEffect(() => {
     if (isLoading) return
     if (currentStats.total === 0) return
-
     const now = new Date()
     const newPoint: GPUPoint = {
       time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       allocated: currentStats.allocated,
       available: currentStats.available,
       total: currentStats.total }
-
-    // Only add if data changed
     const lastPoint = historyRef.current[historyRef.current.length - 1]
     const shouldAdd = !lastPoint ||
       lastPoint.allocated !== newPoint.allocated ||
       lastPoint.available !== newPoint.available
-
     if (shouldAdd) {
       const newHistory = [...historyRef.current, newPoint].slice(-20)
       historyRef.current = newHistory
@@ -164,11 +134,70 @@ export function GPUUtilization() {
     }
   }, [currentStats, isLoading])
 
-  // Pie chart data
-  const pieData = [
-    { name: 'Allocated', value: currentStats.allocated, color: '#9333ea' },
-    { name: 'Available', value: currentStats.available, color: '#22c55e' },
-  ]
+  // Pie chart option
+  const pieOption = useMemo(() => ({
+    backgroundColor: 'transparent',
+    series: [{
+      type: 'pie',
+      radius: ['62%', '88%'],
+      center: ['50%', '50%'],
+      data: [
+        { value: currentStats.allocated, name: 'Allocated', itemStyle: { color: '#9333ea' } },
+        { value: currentStats.available, name: 'Available', itemStyle: { color: '#22c55e' } },
+      ],
+      label: { show: false },
+      emphasis: { scale: false },
+      silent: true,
+    }],
+  }), [currentStats])
+
+  // Trend chart option
+  const trendOption = useMemo(() => ({
+    backgroundColor: 'transparent',
+    grid: { left: 30, right: 5, top: 5, bottom: 20 },
+    xAxis: {
+      type: 'category' as const,
+      data: history.map(d => d.time),
+      axisLabel: { color: CHART_TICK_COLOR, fontSize: 9 },
+      axisLine: { lineStyle: { color: CHART_AXIS_STROKE } },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: 'value' as const,
+      min: 0,
+      max: currentStats.total || undefined,
+      minInterval: 1,
+      axisLabel: { color: CHART_TICK_COLOR, fontSize: 9 },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: CHART_GRID_STROKE, type: 'dashed' as const } },
+    },
+    tooltip: {
+      trigger: 'axis' as const,
+      backgroundColor: (CHART_TOOLTIP_CONTENT_STYLE as Record<string, unknown>).backgroundColor as string,
+      borderColor: (CHART_TOOLTIP_CONTENT_STYLE as Record<string, unknown>).borderColor as string,
+      textStyle: { color: CHART_TICK_COLOR, fontSize: 11 },
+    },
+    series: [
+      {
+        name: 'Allocated GPUs',
+        type: 'line',
+        step: 'end' as const,
+        data: history.map(d => d.allocated),
+        lineStyle: { color: '#9333ea', width: 2 },
+        itemStyle: { color: '#9333ea' },
+        areaStyle: {
+          color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [{ offset: 0, color: 'rgba(147,51,234,0.4)' }, { offset: 1, color: 'rgba(147,51,234,0)' }] },
+        },
+        showSymbol: false,
+        markLine: {
+          silent: true,
+          data: [{ yAxis: currentStats.total, label: { formatter: 'Total', position: 'end', color: '#888', fontSize: 9 }, lineStyle: { color: '#666', type: 'dashed' } }],
+        },
+      },
+    ],
+  }), [history, currentStats.total])
 
   if (isLoading && history.length === 0 && hasReachableClusters) {
     return (
@@ -183,11 +212,9 @@ export function GPUUtilization() {
     )
   }
 
-  // No reachable clusters or no GPUs available - still show filters so user can change selection
   if (!hasReachableClusters || (!hookLoading && currentStats.total === 0)) {
     return (
       <div className="h-full flex flex-col content-loaded">
-        {/* Controls - single row: Time Range → Cluster Filter → Refresh */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             {localClusterFilter.length > 0 && (
@@ -198,7 +225,6 @@ export function GPUUtilization() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Time Range Filter */}
             <div className="flex items-center gap-1">
               <Clock className="w-3 h-3 text-muted-foreground" />
               <select
@@ -212,8 +238,6 @@ export function GPUUtilization() {
                 ))}
               </select>
             </div>
-
-            {/* Cluster Filter */}
             <CardClusterFilter
               availableClusters={availableClustersForFilter}
               selectedClusters={localClusterFilter}
@@ -224,11 +248,8 @@ export function GPUUtilization() {
               containerRef={clusterFilterRef}
               minClusters={1}
             />
-
           </div>
         </div>
-
-        {/* Empty state message */}
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
           {!hasReachableClusters ? 'No reachable clusters' : 'No GPUs detected in selected clusters'}
         </div>
@@ -238,7 +259,6 @@ export function GPUUtilization() {
 
   return (
     <div className="h-full flex flex-col content-loaded">
-      {/* Controls - single row: Time Range → Cluster Filter → Refresh */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           {localClusterFilter.length > 0 && (
@@ -249,7 +269,6 @@ export function GPUUtilization() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Time Range Filter */}
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3 text-muted-foreground" />
             <select
@@ -263,8 +282,6 @@ export function GPUUtilization() {
               ))}
             </select>
           </div>
-
-          {/* Cluster Filter */}
           <CardClusterFilter
             availableClusters={availableClustersForFilter}
             selectedClusters={localClusterFilter}
@@ -275,37 +292,22 @@ export function GPUUtilization() {
             containerRef={clusterFilterRef}
             minClusters={1}
           />
-
         </div>
       </div>
 
       {/* Stats and pie chart row */}
       <div className="flex items-center gap-4 mb-4">
-        {/* Donut chart */}
         <div className="w-20 h-20 relative" style={{ minWidth: 80, minHeight: 80 }}>
-          <ResponsiveContainer width="100%" height="100%" minWidth={80} minHeight={80}>
-            <PieChart>
-              <Pie
-                data={pieData}
-                cx="50%"
-                cy="50%"
-                innerRadius={25}
-                outerRadius={35}
-                dataKey="value"
-                strokeWidth={0}
-              >
-                {pieData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
+          <ReactECharts
+            option={pieOption}
+            style={{ height: 80, width: 80 }}
+            notMerge={true}
+            opts={{ renderer: 'svg' }}
+          />
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="text-sm font-bold text-foreground">{currentStats.utilization}%</span>
           </div>
         </div>
-
-        {/* Stats */}
         <div className="flex-1 grid grid-cols-3 gap-2">
           <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
             <div className="text-xs text-purple-400 mb-1">{t('common.allocated')}</div>
@@ -334,53 +336,16 @@ export function GPUUtilization() {
           </div>
         ) : (
           <div style={{ width: '100%', minHeight: CHART_HEIGHT_COMPACT, height: CHART_HEIGHT_COMPACT }}>
-          <ResponsiveContainer width="100%" height={CHART_HEIGHT_COMPACT}>
-            <AreaChart data={history} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-              <defs>
-                <linearGradient id="gradientAllocated" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#9333ea" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#9333ea" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
-              <XAxis
-                dataKey="time"
-                tick={{ fill: CHART_TICK_COLOR, fontSize: 9 }}
-                axisLine={{ stroke: CHART_AXIS_STROKE }}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fill: CHART_TICK_COLOR, fontSize: 9 }}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-                domain={[0, currentStats.total]}
-              />
-              <Tooltip
-                contentStyle={{ ...CHART_TOOLTIP_CONTENT_STYLE, fontSize: '11px' }}
-                labelStyle={{ color: CHART_TICK_COLOR }}
-              />
-              <ReferenceLine
-                y={currentStats.total}
-                stroke="#666"
-                strokeDasharray="3 3"
-                label={{ value: 'Total', position: 'right', fill: '#888', fontSize: 9 }}
-              />
-              <Area
-                type="stepAfter"
-                dataKey="allocated"
-                stroke="#9333ea"
-                strokeWidth={2}
-                fill="url(#gradientAllocated)"
-                name="Allocated GPUs"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+            <ReactECharts
+              option={trendOption}
+              style={{ height: CHART_HEIGHT_COMPACT, width: '100%' }}
+              notMerge={true}
+              opts={{ renderer: 'svg' }}
+            />
           </div>
         )}
       </div>
 
-      {/* GPU Nodes summary */}
       {(() => {
         const clusterCount = new Set(filteredNodes.map(n => n.cluster.split('/').pop() ?? n.cluster)).size
         return (

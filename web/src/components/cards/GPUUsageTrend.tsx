@@ -1,15 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { TrendingUp, Cpu, Server, Clock } from 'lucide-react'
 import { CardClusterFilter } from '../../lib/cards/CardComponents'
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend } from 'recharts'
+import ReactECharts from 'echarts-for-react'
 import { useClusters } from '../../hooks/useMCP'
 import { useCachedGPUNodes } from '../../hooks/useCachedData'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
@@ -22,8 +14,7 @@ import {
   CHART_GRID_STROKE,
   CHART_AXIS_STROKE,
   CHART_TOOLTIP_CONTENT_STYLE,
-  CHART_TICK_COLOR,
-  CHART_LEGEND_WRAPPER_STYLE } from '../../lib/constants'
+  CHART_TICK_COLOR } from '../../lib/constants'
 
 interface GPUDataPoint {
   time: string
@@ -82,13 +73,11 @@ export function GPUUsageTrend() {
   const STORAGE_KEY = 'gpu-usage-trend-history'
   const MAX_AGE_MS = 30 * 60 * 1000 // 30 minutes - discard older data
 
-  // Load from localStorage on mount
   const loadSavedHistory = (): GPUDataPoint[] => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
         const parsed = JSON.parse(saved) as { data: GPUDataPoint[]; timestamp: number }
-        // Check if data is not too old
         if (Date.now() - parsed.timestamp < MAX_AGE_MS) {
           return parsed.data
         }
@@ -102,7 +91,6 @@ export function GPUUsageTrend() {
   const historyRef = useRef<GPUDataPoint[]>(loadSavedHistory())
   const [history, setHistory] = useState<GPUDataPoint[]>(historyRef.current)
 
-  // Save to localStorage when history changes
   useEffect(() => {
     if (history.length > 0) {
       try {
@@ -110,7 +98,7 @@ export function GPUUsageTrend() {
           data: history,
           timestamp: Date.now() }))
       } catch {
-        // Ignore storage errors (quota exceeded, etc.)
+        // Ignore storage errors
       }
     }
   }, [history])
@@ -121,17 +109,13 @@ export function GPUUsageTrend() {
     return clusters.filter(c => clusterNames.has(normalizeClusterName(c.name)) && c.reachable !== false)
   })()
 
-  // Get available clusters for local filter (respects global filter)
   const availableClustersForFilter = (() => {
     if (isAllClustersSelected) return gpuClusters
     return gpuClusters.filter(c => selectedClusters.includes(c.name))
   })()
 
-  // Filter GPU nodes by selected clusters AND local filter
   const filteredNodes = useMemo(() => {
     let filtered = gpuNodes
-
-    // Apply global cluster filter
     if (!isAllClustersSelected) {
       filtered = filtered.filter(node => {
         const normalizedNodeCluster = normalizeClusterName(node.cluster)
@@ -143,8 +127,6 @@ export function GPUUsageTrend() {
         })
       })
     }
-
-    // Apply local cluster filter
     if (localClusterFilter.length > 0) {
       filtered = filtered.filter(node => {
         const normalizedNodeCluster = normalizeClusterName(node.cluster)
@@ -156,7 +138,6 @@ export function GPUUsageTrend() {
         })
       })
     }
-
     return filtered
   }, [gpuNodes, selectedClusters, isAllClustersSelected, localClusterFilter])
 
@@ -169,35 +150,25 @@ export function GPUUsageTrend() {
     })
   }
 
-  // Calculate current GPU totals
   const currentTotals = useMemo(() => {
     const available = filteredNodes.reduce((sum, n) => sum + (n.gpuCount || 0), 0)
     const allocated = filteredNodes.reduce((sum, n) => sum + (n.gpuAllocated || 0), 0)
-    return {
-      available,
-      allocated,
-      free: available - allocated }
+    return { available, allocated, free: available - allocated }
   }, [filteredNodes])
 
-  // Get time range config
   const timeRangeConfig = TIME_RANGE_OPTIONS.find(t => t.value === timeRange) || TIME_RANGE_OPTIONS[1]
 
-  // Add data point to history on each update
   useEffect(() => {
     if (isLoading) return
     if (currentTotals.available === 0) return
-
     const now = new Date()
     const newPoint: GPUDataPoint = {
       time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       ...currentTotals }
-
-    // Only add if data changed significantly
     const lastPoint = historyRef.current[historyRef.current.length - 1]
     const shouldAdd = !lastPoint ||
       lastPoint.available !== newPoint.available ||
       lastPoint.allocated !== newPoint.allocated
-
     if (shouldAdd) {
       const maxPoints = timeRangeConfig.points
       const newHistory = [...historyRef.current, newPoint].slice(-maxPoints)
@@ -206,18 +177,86 @@ export function GPUUsageTrend() {
     }
   }, [currentTotals, isLoading, timeRangeConfig.points])
 
-  // Calculate usage percentage
   const usagePercent = currentTotals.available > 0
     ? Math.round((currentTotals.allocated / currentTotals.available) * 100)
     : 0
 
-  // Determine color based on usage
   const getUsageColor = () => {
     if (usagePercent >= 90) return 'text-red-400'
     if (usagePercent >= 75) return 'text-orange-400'
     if (usagePercent >= 50) return 'text-yellow-400'
     return 'text-green-400'
   }
+
+  const chartOption = useMemo(() => ({
+    backgroundColor: 'transparent',
+    grid: { left: 40, right: 5, top: 5, bottom: 40 },
+    xAxis: {
+      type: 'category' as const,
+      data: history.map(d => d.time),
+      axisLabel: { color: CHART_TICK_COLOR, fontSize: 10 },
+      axisLine: { lineStyle: { color: CHART_AXIS_STROKE } },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: 'value' as const,
+      minInterval: 1,
+      axisLabel: { color: CHART_TICK_COLOR, fontSize: 10 },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: CHART_GRID_STROKE, type: 'dashed' as const } },
+    },
+    tooltip: {
+      trigger: 'axis' as const,
+      backgroundColor: (CHART_TOOLTIP_CONTENT_STYLE as Record<string, unknown>).backgroundColor as string,
+      borderColor: (CHART_TOOLTIP_CONTENT_STYLE as Record<string, unknown>).borderColor as string,
+      textStyle: { color: CHART_TICK_COLOR, fontSize: 12 },
+      formatter: (params: Array<{ seriesName: string; value: number; color: string }>) => {
+        let html = ''
+        for (const p of (params || [])) {
+          const label = p.seriesName === 'allocated' ? 'In Use' : 'Free'
+          html += `<div><span style="color:${p.color}">\u25CF</span> ${label}: ${p.value} GPUs</div>`
+        }
+        return html
+      },
+    },
+    legend: {
+      data: ['In Use', 'Free'],
+      bottom: 0,
+      textStyle: { color: '#888', fontSize: 10 },
+      icon: 'rect',
+    },
+    series: [
+      {
+        name: 'allocated',
+        type: 'line',
+        stack: 'total',
+        step: 'end' as const,
+        data: history.map(d => d.allocated),
+        lineStyle: { color: '#9333ea', width: 2 },
+        itemStyle: { color: '#9333ea' },
+        areaStyle: {
+          color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [{ offset: 0, color: 'rgba(147,51,234,0.6)' }, { offset: 1, color: 'rgba(147,51,234,0.1)' }] },
+        },
+        showSymbol: false,
+      },
+      {
+        name: 'free',
+        type: 'line',
+        stack: 'total',
+        step: 'end' as const,
+        data: history.map(d => d.free),
+        lineStyle: { color: '#22c55e', width: 2 },
+        itemStyle: { color: '#22c55e' },
+        areaStyle: {
+          color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [{ offset: 0, color: 'rgba(34,197,94,0.6)' }, { offset: 1, color: 'rgba(34,197,94,0.1)' }] },
+        },
+        showSymbol: false,
+      },
+    ],
+  }), [history])
 
   if (isLoading && history.length === 0) {
     return (
@@ -235,8 +274,7 @@ export function GPUUsageTrend() {
   if (gpuNodes.length === 0) {
     return (
       <div className="h-full flex flex-col content-loaded">
-        <div className="flex items-center justify-end mb-3">
-        </div>
+        <div className="flex items-center justify-end mb-3" />
         <div className="flex-1 flex flex-col items-center justify-center text-center">
           <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mb-3">
             <Cpu className="w-6 h-6 text-muted-foreground" />
@@ -250,7 +288,6 @@ export function GPUUsageTrend() {
 
   return (
     <div className="h-full flex flex-col content-loaded">
-      {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           {localClusterFilter.length > 0 && (
@@ -261,10 +298,7 @@ export function GPUUsageTrend() {
           )}
         </div>
       </div>
-
-      {/* Filter controls */}
       <div className="flex items-center gap-2 mb-3">
-        {/* Time Range Filter */}
         <div className="flex items-center gap-1">
           <Clock className="w-3 h-3 text-muted-foreground" />
           <select
@@ -278,8 +312,6 @@ export function GPUUsageTrend() {
             ))}
           </select>
         </div>
-
-        {/* Cluster Filter */}
         <CardClusterFilter
           availableClusters={availableClustersForFilter}
           selectedClusters={localClusterFilter}
@@ -292,7 +324,6 @@ export function GPUUsageTrend() {
         />
       </div>
 
-      {/* Stats row */}
       <div className="grid grid-cols-4 gap-2 mb-4">
         <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20" title={`${currentTotals.available} total GPUs available`}>
           <div className="flex items-center gap-1 mb-1">
@@ -324,7 +355,6 @@ export function GPUUsageTrend() {
         </div>
       </div>
 
-      {/* Stacked Area Chart */}
       <div className="flex-1 min-h-[160px]">
         {history.length === 0 ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
@@ -332,69 +362,16 @@ export function GPUUsageTrend() {
           </div>
         ) : (
           <div style={{ width: '100%', minHeight: CHART_HEIGHT_STANDARD, height: CHART_HEIGHT_STANDARD }} role="img" aria-label={`GPU usage trend chart: ${currentTotals.allocated} of ${currentTotals.available} GPUs in use (${usagePercent}% utilization)`}>
-            <ResponsiveContainer width="100%" height={CHART_HEIGHT_STANDARD}>
-              <AreaChart data={history} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-                <defs>
-                  <linearGradient id="gradientAllocated" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#9333ea" stopOpacity={0.6} />
-                    <stop offset="95%" stopColor="#9333ea" stopOpacity={0.1} />
-                  </linearGradient>
-                  <linearGradient id="gradientFree" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.6} />
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0.1} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
-                <XAxis
-                  dataKey="time"
-                  tick={{ fill: CHART_TICK_COLOR, fontSize: 10 }}
-                  axisLine={{ stroke: CHART_AXIS_STROKE }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: CHART_TICK_COLOR, fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                  labelStyle={{ color: CHART_TICK_COLOR }}
-                  formatter={(value, name) => {
-                    const label = name === 'allocated' ? 'In Use' : 'Free'
-                    return [`${value} GPUs`, label]
-                  }}
-                />
-                <Legend
-                  wrapperStyle={CHART_LEGEND_WRAPPER_STYLE}
-                  iconType="rect"
-                  formatter={(value) => value === 'allocated' ? 'In Use' : 'Free'}
-                />
-                <Area
-                  type="stepAfter"
-                  dataKey="allocated"
-                  stackId="1"
-                  stroke="#9333ea"
-                  strokeWidth={2}
-                  fill="url(#gradientAllocated)"
-                  name="allocated"
-                />
-                <Area
-                  type="stepAfter"
-                  dataKey="free"
-                  stackId="1"
-                  stroke="#22c55e"
-                  strokeWidth={2}
-                  fill="url(#gradientFree)"
-                  name="free"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <ReactECharts
+              option={chartOption}
+              style={{ height: CHART_HEIGHT_STANDARD, width: '100%' }}
+              notMerge={true}
+              opts={{ renderer: 'svg' }}
+            />
           </div>
         )}
       </div>
 
-      {/* Footer with GPU types breakdown */}
       {filteredNodes.length > 0 && (
         <div className="mt-3 pt-3 border-t border-border/50">
           <div className="flex flex-wrap gap-2">
