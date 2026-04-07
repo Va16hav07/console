@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Server, Activity, Box, Cpu, ChevronRight } from 'lucide-react'
 import { useClusters } from '../../hooks/useMCP'
 import { useCachedGPUNodes } from '../../hooks/useCachedData'
@@ -63,10 +63,16 @@ export function ClusterComparison({ config }: ClusterComparisonProps) {
   }, [rawClusters, globalSelectedClusters, isAllClustersSelected, customFilter])
 
   // Reset local cluster selection when global filters change
+  const prevClusterNamesRef = useRef('')
   useEffect(() => {
-    // Filter out any locally selected clusters that are no longer in the filtered set
+    const names = allClusters.map(c => c.name).sort().join(',')
+    if (names === prevClusterNamesRef.current) return
+    prevClusterNamesRef.current = names
     const availableNames = new Set(allClusters.map(c => c.name))
-    setSelectedClusters(prev => prev.filter(name => availableNames.has(name)))
+    setSelectedClusters(prev => {
+      const filtered = prev.filter(name => availableNames.has(name))
+      return filtered.length === prev.length ? prev : filtered
+    })
   }, [allClusters])
 
   const gpuByCluster = (() => {

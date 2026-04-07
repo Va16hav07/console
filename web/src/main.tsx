@@ -132,11 +132,9 @@ enableMocking()
 
     // ── Render FIRST — don't block on async work ──────────────────────
     ReactDOM.createRoot(document.getElementById('root')!).render(
-      <React.StrictMode>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </React.StrictMode>,
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>,
     )
 
     // ── Async setup (runs in background after render) ─────────────────
