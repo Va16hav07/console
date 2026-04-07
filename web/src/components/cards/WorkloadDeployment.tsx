@@ -1,5 +1,4 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useDraggable } from '@dnd-kit/core'
 import {
   Box,
@@ -529,7 +528,6 @@ interface WorkloadDeploymentProps {
 
 export function WorkloadDeployment(_props: WorkloadDeploymentProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const [typeFilter, setTypeFilter] = useState<WorkloadType | 'All'>('All')
   const [statusFilter, setStatusFilter] = useState<WorkloadStatus | 'All'>('All')
   const [selectedWorkload, setSelectedWorkload] = useState<Workload | null>(null)
