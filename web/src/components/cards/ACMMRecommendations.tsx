@@ -2,7 +2,7 @@
  * ACMM Recommendations Card
  *
  * Shows the user's current role, the next transition trigger, and the
- * top prioritized recommendations (missing feedback loops) merged from
+ * top prioritized recommendations (missing criteria) merged from
  * all registered sources.
  */
 
@@ -11,55 +11,20 @@ import { useCardLoadingState } from './CardDataContext'
 import { CardSkeleton } from '../../lib/cards/CardComponents'
 import { useACMM } from '../acmm/ACMMProvider'
 import { useMissions } from '../../hooks/useMissions'
+import { SOURCES_BY_ID } from '../../lib/acmm/sources'
 import type { Recommendation } from '../../lib/acmm/computeRecommendations'
-import type { DetectionHint, SourceId } from '../../lib/acmm/sources/types'
+import type { SourceId } from '../../lib/acmm/sources/types'
+import {
+  detectionLabel,
+  singleRecommendationPrompt,
+  allRecommendationsPrompt,
+} from '../../lib/acmm/missionPrompts'
 
 const SOURCE_LABELS: Record<SourceId, string> = {
   acmm: 'ACMM',
   fullsend: 'Fullsend',
   'agentic-engineering-framework': 'AEF',
   'claude-reflect': 'Reflect',
-}
-
-function detectionLabel(hint: DetectionHint): string {
-  const patterns = Array.isArray(hint.pattern) ? hint.pattern : [hint.pattern]
-  return patterns.join(' · ')
-}
-
-function singleRecommendationPrompt(rec: Recommendation, repo: string): string {
-  const c = rec.criterion
-  const ref = c.referencePath ? `\n- Reference implementation: ${c.referencePath} in kubestellar/console` : ''
-  return `Add the "${c.name}" feedback loop to ${repo} so the ACMM dashboard detects it.
-
-Source: ${SOURCE_LABELS[c.source]}
-Criterion ID: ${c.id}
-What this loop does: ${c.description}
-Why it matters: ${rec.reason}
-
-Detection rule (must match at least one after your change):
-- Type: ${c.detection.type}
-- Pattern: ${detectionLabel(c.detection)}${ref}
-
-Please:
-1. Audit the existing repo for any similar artifact that could already satisfy this detection (don't duplicate).
-2. If missing, create/commit the minimum file(s) that match the detection pattern and follow our project conventions.
-3. Return a short summary of what was added and why.
-Do not push or open a PR automatically — stop after the commit so I can review.`
-}
-
-function allRecommendationsPrompt(recs: Recommendation[], repo: string): string {
-  const list = recs
-    .map((r, i) => `${i + 1}. ${r.criterion.name} (${SOURCE_LABELS[r.criterion.source]}) — detection: ${detectionLabel(r.criterion.detection)}`)
-    .join('\n')
-  return `Implement the missing ACMM feedback loops for ${repo}:
-
-${list}
-
-For each item:
-- Check whether an equivalent artifact already exists under a non-standard path (don't duplicate).
-- If truly missing, add the minimum change that matches the detection pattern and follows the repo's conventions.
-- Return a brief summary of what changed for each loop.
-Do not push or open a PR automatically — stop after commits so I can review.`
 }
 
 export function ACMMRecommendations() {
@@ -69,7 +34,7 @@ export function ACMMRecommendations() {
 
   function launchOne(rec: Recommendation) {
     startMission({
-      title: `Add ACMM loop: ${rec.criterion.name}`,
+      title: `Add ACMM criterion: ${rec.criterion.name}`,
       description: `Add "${rec.criterion.name}" to ${repo}`,
       type: 'custom',
       initialPrompt: singleRecommendationPrompt(rec, repo),
@@ -80,7 +45,7 @@ export function ACMMRecommendations() {
   function launchAll() {
     if (recommendations.length === 0) return
     startMission({
-      title: `Add ${recommendations.length} missing ACMM loops`,
+      title: `Add ${recommendations.length} missing ACMM criteria`,
       description: `Implement all top ACMM recommendations for ${repo}`,
       type: 'custom',
       initialPrompt: allRecommendationsPrompt(recommendations, repo),
@@ -135,10 +100,10 @@ export function ACMMRecommendations() {
               type="button"
               onClick={launchAll}
               className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
-              title={`Launch an AI mission to implement all ${recommendations.length} recommendations`}
+              title={`Ask the selected agent to add all ${recommendations.length} missing criteria to ${repo}`}
             >
               <Sparkles className="w-2.5 h-2.5" />
-              Launch mission (all)
+              Ask agent for help with all ({recommendations.length})
             </button>
           )}
         </div>
@@ -151,14 +116,24 @@ export function ACMMRecommendations() {
               <div className="flex items-start justify-between gap-2">
                 <div className="text-xs font-medium flex-1">{rec.criterion.name}</div>
                 <div className="flex gap-1 flex-shrink-0">
-                  {rec.sources.map((s) => (
-                    <span
-                      key={s}
-                      className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary"
-                    >
-                      {SOURCE_LABELS[s]}
-                    </span>
-                  ))}
+                  {rec.sources.map((s) => {
+                    const src = SOURCES_BY_ID[s]
+                    const badge = (
+                      <span
+                        className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary hover:bg-primary/30"
+                        title={src?.citation}
+                      >
+                        {SOURCE_LABELS[s]}
+                      </span>
+                    )
+                    return src?.url ? (
+                      <a key={s} href={src.url} target="_blank" rel="noopener noreferrer" className="no-underline">
+                        {badge}
+                      </a>
+                    ) : (
+                      <span key={s}>{badge}</span>
+                    )
+                  })}
                 </div>
               </div>
               <div className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
@@ -175,10 +150,10 @@ export function ACMMRecommendations() {
                   type="button"
                   onClick={() => launchOne(rec)}
                   className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex-shrink-0"
-                  title={'Launch an AI mission to add this loop'}
+                  title={`Ask the selected agent to add the "${rec.criterion.name}" criterion to ${repo}`}
                 >
                   <Zap className="w-2.5 h-2.5" />
-                  Launch
+                  Ask agent for help
                 </button>
               </div>
             </div>

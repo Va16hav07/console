@@ -7,12 +7,14 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Check, X, Filter, ChevronDown, ChevronRight, Flag } from 'lucide-react'
+import { Check, X, Filter, ChevronDown, ChevronRight, Flag, Sparkles } from 'lucide-react'
 import { useCardLoadingState } from './CardDataContext'
 import { CardSkeleton } from '../../lib/cards/CardComponents'
 import { useACMM } from '../acmm/ACMMProvider'
-import { ALL_CRITERIA } from '../../lib/acmm/sources'
-import type { Criterion, DetectionHint, SourceId } from '../../lib/acmm/sources/types'
+import { useMissions } from '../../hooks/useMissions'
+import { ALL_CRITERIA, SOURCES_BY_ID } from '../../lib/acmm/sources'
+import type { Criterion, SourceId } from '../../lib/acmm/sources/types'
+import { detectionLabel, singleCriterionPrompt } from '../../lib/acmm/missionPrompts'
 
 type StatusFilter = 'all' | 'detected' | 'missing'
 
@@ -40,11 +42,6 @@ const SOURCE_FILES: Record<SourceId, string> = {
 
 const CONSOLE_REPO = 'kubestellar/console'
 
-function detectionLabel(hint: DetectionHint): string {
-  const patterns = Array.isArray(hint.pattern) ? hint.pattern : [hint.pattern]
-  return patterns.join(' · ')
-}
-
 function proposeChangeUrl(c: Criterion): string {
   const title = encodeURIComponent(`ACMM criterion fix: ${c.id}`)
   const body = encodeURIComponent(
@@ -59,12 +56,23 @@ function proposeChangeUrl(c: Criterion): string {
 }
 
 export function ACMMFeedbackLoops() {
-  const { scan } = useACMM()
+  const { scan, repo } = useACMM()
   const { detectedIds, isLoading, isRefreshing, isDemoData, isFailed, consecutiveFailures, lastRefresh } = scan
+  const { startMission } = useMissions()
 
   const [sourceFilter, setSourceFilter] = useState<SourceId | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  function launchOne(c: Criterion) {
+    startMission({
+      title: `Add ACMM criterion: ${c.name}`,
+      description: `Add "${c.name}" to ${repo}`,
+      type: 'custom',
+      initialPrompt: singleCriterionPrompt(c, repo),
+      context: { repo, criterionId: c.id },
+    })
+  }
 
   const hasData = detectedIds.size > 0
   const { showSkeleton } = useCardLoadingState({
@@ -160,12 +168,34 @@ export function ACMMFeedbackLoops() {
                 {c.level && (
                   <span className="text-[10px] font-mono text-muted-foreground">L{c.level}</span>
                 )}
-                <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${SOURCE_COLORS[c.source]}`}>
+                <span
+                  className={`text-[9px] px-1.5 py-0.5 rounded-full ${SOURCE_COLORS[c.source]}`}
+                  title={SOURCES_BY_ID[c.source]?.citation}
+                >
                   {SOURCE_LABELS[c.source]}
                 </span>
               </button>
               {isExpanded && (
                 <div className="px-8 pb-2 pt-0 text-[10px] space-y-1.5 border-t border-border/30">
+                  {SOURCES_BY_ID[c.source]?.url && (
+                    <div>
+                      <span className="text-muted-foreground">Cited from:</span>{' '}
+                      <a
+                        href={SOURCES_BY_ID[c.source].url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                        title={SOURCES_BY_ID[c.source]?.citation}
+                      >
+                        {SOURCES_BY_ID[c.source].name}
+                      </a>
+                      {SOURCES_BY_ID[c.source]?.citation && (
+                        <span className="ml-1 text-muted-foreground/70 italic">
+                          — {SOURCES_BY_ID[c.source].citation}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div>
                     <span className="text-muted-foreground">Detection ({c.detection.type}):</span>{' '}
                     <code className="font-mono bg-background/60 px-1 py-0.5 rounded">
@@ -185,7 +215,7 @@ export function ACMMFeedbackLoops() {
                       </a>
                     </div>
                   )}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <a
                       href={`https://github.com/${CONSOLE_REPO}/blob/main/${SOURCE_FILES[c.source]}`}
                       target="_blank"
@@ -203,6 +233,25 @@ export function ACMMFeedbackLoops() {
                       <Flag className="w-2.5 h-2.5" />
                       Propose a change
                     </a>
+                    {/* AI mission star — only offered for missing loops; an
+                        already-detected loop has nothing to add. Mirrors the
+                        per-recommendation "Launch" button on the Your Role
+                        card so users get the same affordance from either
+                        entry point. */}
+                    {!detected && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          launchOne(c)
+                        }}
+                        className="inline-flex items-center gap-1 text-primary hover:text-primary/80"
+                        title={`Ask the selected agent to add the "${c.name}" criterion to ${repo}`}
+                      >
+                        <Sparkles className="w-2.5 h-2.5" />
+                        Ask agent for help
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
