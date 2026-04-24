@@ -21,7 +21,7 @@ import { useKeepAliveActive } from '../../../../hooks/useKeepAliveActive'
 const dataHookRegistry: Record<
   string,
   (params?: Record<string, unknown>) => {
-    data: unknown[] | undefined
+    data: unknown[] | unknown | undefined
     isLoading: boolean
     error: Error | null
     refetch?: () => void
@@ -71,7 +71,7 @@ export function useDataHookRegistryVersion(): number {
 export function registerDataHook(
   name: string,
   hook: (params?: Record<string, unknown>) => {
-    data: unknown[] | undefined
+    data: unknown[] | unknown | undefined
     isLoading: boolean
     error: Error | null
     refetch?: () => void
@@ -98,7 +98,7 @@ export function getRegisteredDataHooks(): string[] {
 }
 
 export interface UseDataSourceResult {
-  data: unknown[] | undefined
+  data: unknown[] | unknown | undefined
   isLoading: boolean
   error: Error | null
   refetch: () => void

@@ -3006,6 +3006,18 @@
     "selectCluster": "Select cluster...",
     "allNamespaces": "All namespaces"
   },
+  "chaosMeshStatus": {
+    "totalExperiments": "Experiments",
+    "running": "Running",
+    "finished": "Finished",
+    "failed": "Failed",
+    "sectionExperiments": "Chaos Experiments",
+    "sectionWorkflows": "Chaos Workflows",
+    "notInstalled": "Chaos Mesh not detected",
+    "notInstalledHint": "No PodChaos or Workflow resources found.",
+    "fetchError": "Failed to fetch Chaos Mesh status",
+    "noExperiments": "No experiments found."
+  },
   "fluxStatus": {
     "healthy": "Healthy",
     "degraded": "Degraded",

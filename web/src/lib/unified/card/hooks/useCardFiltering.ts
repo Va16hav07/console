@@ -10,7 +10,7 @@ import type { CardFilterConfig } from '../../types'
 
 export interface UseCardFilteringResult {
   /** Filtered data */
-  filteredData: unknown[] | undefined
+  filteredData: unknown[] | unknown | undefined
   /** Filter control components to render */
   filterControls: ReactNode
   /** Current filter state */
@@ -25,7 +25,7 @@ export interface UseCardFilteringResult {
  * useCardFiltering - Apply configured filters to data
  */
 export function useCardFiltering(
-  data: unknown[] | undefined,
+  data: unknown[] | unknown | undefined,
   filters?: CardFilterConfig[]
 ): UseCardFilteringResult {
   // Filter state - keyed by field name
@@ -47,6 +47,7 @@ export function useCardFiltering(
   const filteredData = useMemo(() => {
     if (!data) return undefined
     if (!filters || filters.length === 0) return data
+    if (!Array.isArray(data)) return data
 
     let result = [...data]
 

@@ -202,6 +202,7 @@ import { cascadeImpactMapConfig } from './cascade-impact-map'
 import { configDriftHeatmapConfig } from './config-drift-heatmap'
 import { resourceImbalanceDetectorConfig } from './resource-imbalance-detector'
 import { rightSizeAdvisorConfig } from './right-size-advisor'
+import { chaosMeshStatusConfig } from './chaos-mesh-status'
 import { restartCorrelationMatrixConfig } from './restart-correlation-matrix'
 import { deploymentRolloutTrackerConfig } from './deployment-rollout-tracker'
 import { fleetComplianceHeatmapConfig } from './fleet-compliance-heatmap'
@@ -408,6 +409,7 @@ export const CARD_CONFIGS: CardConfigRegistry = {
   config_drift_heatmap: configDriftHeatmapConfig,
   resource_imbalance_detector: resourceImbalanceDetectorConfig,
   right_size_advisor: rightSizeAdvisorConfig,
+  chaos_mesh_status: chaosMeshStatusConfig,
   restart_correlation_matrix: restartCorrelationMatrixConfig,
   deployment_rollout_tracker: deploymentRolloutTrackerConfig,
   // Cross-cluster compliance cards
@@ -548,6 +550,7 @@ export {
   deploymentMissionsConfig,
   deploymentProgressConfig,
   deploymentStatusConfig,
+  chaosMeshStatusConfig,
   dynamicCardConfig,
   eventStreamConfig,
   eventSummaryConfig,

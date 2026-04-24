@@ -151,7 +151,7 @@ export function UnifiedCard({
     }
 
     // Empty state
-    if (!filteredData || filteredData.length === 0) {
+    if (!filteredData || (Array.isArray(filteredData) && filteredData.length === 0)) {
       return <EmptyState config={mergedConfig.emptyState} />
     }
 
@@ -185,7 +185,7 @@ export function UnifiedCard({
  */
 function renderContent(
   content: CardContent,
-  data: unknown[],
+  data: unknown[] | unknown,
   config: UnifiedCardConfig,
   onDrillDown?: (item: Record<string, unknown>) => void
 ): ReactNode {
@@ -194,7 +194,7 @@ function renderContent(
       return (
         <ListVisualization
           content={content}
-          data={data}
+          data={data as unknown[]}
           drillDown={config.drillDown}
           onDrillDown={onDrillDown}
         />
@@ -204,7 +204,7 @@ function renderContent(
       return (
         <TableVisualization
           content={content}
-          data={data}
+          data={data as unknown[]}
           drillDown={config.drillDown}
           onDrillDown={onDrillDown}
         />
@@ -214,7 +214,7 @@ function renderContent(
       return (
         <ChartVisualization
           content={content}
-          data={data}
+          data={data as unknown[]}
         />
       )
 
@@ -231,7 +231,7 @@ function renderContent(
       return (
         <PlaceholderVisualization
           type={`custom: ${content.componentName}`}
-          itemCount={data.length}
+          itemCount={Array.isArray(data) ? data.length : data ? 1 : 0}
         />
       )
 
@@ -399,7 +399,7 @@ function InlineStats({
   stats,
   data: _data }: {
   stats: NonNullable<UnifiedCardConfig['stats']>
-  data: unknown[] | undefined
+  data: unknown[] | unknown | undefined
 }) {
   return (
     <div className="flex items-center gap-3 px-2 py-1.5 border-b border-border">
@@ -421,12 +421,12 @@ function CardFooter({
   config,
   data }: {
   config: NonNullable<UnifiedCardConfig['footer']>
-  data: unknown[] | undefined
+  data: unknown[] | unknown | undefined
 }) {
   return (
     <div className="flex items-center justify-between px-2 py-1.5 text-xs text-muted-foreground border-t border-border">
-      {config.showTotal && data && (
-        <span>{data.length} items</span>
+      {config.showTotal && !!data && (
+        <span>{Array.isArray(data) ? data.length : 1} items</span>
       )}
       {config.text && <span>{config.text}</span>}
       {config.pagination && (

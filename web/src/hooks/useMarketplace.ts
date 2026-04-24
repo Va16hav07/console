@@ -113,6 +113,7 @@ const MARKETPLACE_TO_CARD_TYPE: Record<string, string> = {
   'cncf-tikv': 'tikv_status',
   'cncf-tuf': 'tuf_status',
   'cncf-vitess': 'vitess_status',
+  'cncf-chaos-mesh': 'chaos_mesh_status',
 }
 
 /**

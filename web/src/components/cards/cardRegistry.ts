@@ -104,6 +104,8 @@ const TikvStatus = safeLazy(() => import('./tikv_status'), 'TikvStatus')
 const TufStatus = safeLazy(() => import('./tuf_status'), 'TufStatus')
 // Vitess distributed MySQL card
 const VitessStatus = safeLazy(() => import('./vitess_status'), 'VitessStatus')
+// Chaos Mesh fault-injection and chaos engineering card
+const ChaosMeshStatus = safeLazy(() => import('./chaos_mesh_status'), 'ChaosMeshStatus')
 const OverlayComparison = safeLazy(() => _deployBundle, 'OverlayComparison')
 const ArgoCDApplications = safeLazy(() => _deployBundle, 'ArgoCDApplications')
 const ArgoCDApplicationSets = safeLazy(() => _deployBundle, 'ArgoCDApplicationSets')
@@ -493,6 +495,7 @@ const RAW_CARD_COMPONENTS: Record<string, CardComponent> = {
   // Kustomize-scoped cards
   kustomization_status: KustomizationStatus,
   flux_status: FluxStatus,
+  chaos_mesh_status: ChaosMeshStatus,
   overlay_comparison: OverlayComparison,
   // ArgoCD cards
   argocd_applications: ArgoCDApplications,
@@ -1094,6 +1097,8 @@ const CARD_CHUNK_PRELOADERS: Record<string, () => Promise<unknown>> = {
   tikv_status: () => import('./tikv_status'),
   tuf_status: () => import('./tuf_status'),
   vitess_status: () => import('./vitess_status'),
+  // Chaos Mesh fault-injection and chaos engineering
+  chaos_mesh_status: () => import('./chaos_mesh_status'),
   overlay_comparison: () => import('./deploy-bundle'),
   argocd_applications: () => import('./deploy-bundle'),
   argocd_applicationsets: () => import('./deploy-bundle'),
@@ -1396,6 +1401,7 @@ export function prefetchDemoCardChunks(): void {
  * Primarily time-series, trend, and event streaming cards.
  */
 export const LIVE_DATA_CARDS = new Set([
+  'chaos_mesh_status',
   // Time-series trend cards
   'pod_health_trend',
   'resource_trend',
@@ -1710,6 +1716,7 @@ export const CARD_DEFAULT_WIDTHS: Record<string, number> = {
   tikv_status: 6,
   tuf_status: 6,
   vitess_status: 6,
+  chaos_mesh_status: 6,
   pvc_status: 6,
   gpu_status: 6,
   gpu_inventory: 6,

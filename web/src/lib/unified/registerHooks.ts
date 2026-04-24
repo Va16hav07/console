@@ -50,6 +50,7 @@ import {
 import { useFluxStatus } from '../../components/cards/flux_status/useFluxStatus'
 import { useCachedBackstage } from '../../hooks/useCachedBackstage'
 import { useContourStatus } from '../../components/cards/contour_status/useContourStatus'
+import { useChaosMeshStatus } from '../../components/cards/chaos_mesh_status/useChaosMeshStatus'
 import { useCachedContainerd } from '../../hooks/useCachedContainerd'
 import { useCachedCortex } from '../../hooks/useCachedCortex'
 import { useCachedDapr } from '../../hooks/useCachedDapr'
@@ -1058,6 +1059,16 @@ function useUnifiedContourStatus() {
   }
 }
 
+function useUnifiedChaosMeshStatus() {
+  const result = useChaosMeshStatus()
+  return {
+    data: result.data,
+    isLoading: result.showSkeleton,
+    error: result.error ? new Error('Failed to fetch Chaos Mesh status') : null,
+    refetch: () => {},
+  }
+}
+
 function useUnifiedContainerdStatus() {
   const result = useCachedContainerd()
   return {
@@ -1269,7 +1280,6 @@ function useUnifiedVitessStatus() {
     refetch: result.refetch,
   }
 }
-
 function useProviderHealth() {
   return useDemoDataHook(DEMO_PROVIDER_HEALTH)
 }
@@ -1457,6 +1467,7 @@ export function registerUnifiedHooks(): void {
   registerDataHook('useKustomizationStatus', useKustomizationStatus)
   registerDataHook('useFluxStatus', useUnifiedFluxStatus)
   registerDataHook('useContourStatus', useUnifiedContourStatus)
+  registerDataHook('useChaosMeshStatus', useUnifiedChaosMeshStatus)
   registerDataHook('useCachedBackstage', useUnifiedBackstageStatus)
   registerDataHook('useCachedContainerd', useUnifiedContainerdStatus)
   registerDataHook('useCachedCortex', useUnifiedCortexStatus)
