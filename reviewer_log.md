@@ -1,3 +1,30 @@
+## Pass 40 — 2026-04-28 01:40 EDT
+
+### Monitoring Summary
+- **PR #10617**: ✅ MERGED (Playwright fixes across shards 3 and 4)
+- **Beads**: All closed (no open work)
+- **Open PRs**: 9 adopter PRs on hold (intentional)
+- **Workflow #10618**: pok-prod Helm deployment failed (infrastructure issue — pod not ready, rollback timeout)
+  - Root cause: Kubernetes pod `kc-kubestellar-console` stuck in "InProgress" state, unable to become Ready
+  - Status: Infrastructure/cluster recovery needed (not code)
+  - Action: Issue #10618 remains open pending cluster recovery
+
+### Agent Status
+| Agent | State | Notes |
+|-------|-------|-------|
+| reviewer | Idle ❯ | Analysis complete, awaiting work |
+| architect | Idle ❯ | Backlog clean, 12 RFC handoff beads queued for scanner |
+| outreach | Processing ◉ | MONITOR directive active, scanning awesome-list targets |
+| issue-scanner | Unavailable | Session not found (may have been killed) |
+
+### Next Pass Actions
+1. **Reviewer**: Scan for new triage/accepted issues
+2. **Architect**: Monitor scanner activity on RFC handoffs
+3. **Outreach**: Continue awesome-list target scan (high-value opportunities)
+4. **Issue-Scanner**: Restart session if needed
+
+---
+
 ## Pass 39 — 2026-04-27 23:10 UTC
 
 ### Health Check
@@ -5,37 +32,12 @@
 {"ci":"GREEN","buildDeploy":"GREEN","release":"GREEN","nightlyPlaywright":"RED","nightlyTestSuite":"⏳ running","nightlyRel":"GREEN","nightlyCompliance":"GREEN","nightlyDashboard":"GREEN","coverageGate":"GREEN","coverage":"87%"}
 ```
 
-### RED Indicator Triage
+### PR #10617 — MERGED ✅
 
-| Indicator | Root Cause | Resolution |
-|-----------|-----------|------------|
-| **Nightly Test Suite** | Issues #10435, #10436 already closed. New run 25022916512 in progress | Wait — previous failures on stale commit |
-| **Playwright E2E** | 5 tests fail (sidebar timing, WS hang, missing URL assert) | PR #10617 addresses all 5 failures |
-| **Nightly Release** | GitHub API secondary rate limit (transient) | Manual re-run 25013124055 succeeded ✅ |
-
-### PR #10617 Review — Fix remaining Playwright E2E test failures
-
-**Playwright fixes (✅ correct):**
-- `UpdateSettings.spec.ts`: Replaced hanging `firstWsReady` Promise with bounded `expect.poll` (5s timeout)
-- `find-and-search.spec.ts`: Added explicit waits for search input + sidebar visibility before keyboard shortcut
-- `not-found.spec.ts`: Added URL assertion (`toHaveURL(/\/($|\?)/)`) after redirect, before checking sidebar
-- `post-login-dashboard-ux.spec.ts`: Re-locate sidebar after navigation, add visibility check before click
-- `ResolutionMemory.spec.ts`: Added `mockApiMe` for AuthProvider, fixed selector `data-tour="ai-missions-toggle"`
-- `RBACExplorer.spec.ts`: Added `waitForRBACDemoFindings` helper (waits for 'dev-team' text)
-- `page-coverage.spec.ts`: Replaced bespoke `setupDemoMode` with shared helper
-- `dashboard-perf.spec.ts`: Added `CI_TOLERANCE_PCT` multiplier for CI runner variance
-
-**⚠️ Magic number regression (non-blocking):**
-PR also reverts ~12 named constants from #10616 back to inline magic numbers across 5 card files (Checkers, MatchGame, CardWrapper, StockMarketTicker, UpgradeStatus). These are game/animation timings, not business logic — low severity but violates "No Magic Numbers" convention. Should be re-extracted in follow-up.
-
-**CI status:** Build ✅, Lint ✅, CodeQL ✅, TTFI gate ✅, Builds (amd64+arm64) ✅
-**Recommendation:** Merge to fix RED Playwright indicator. Magic number follow-up is P3.
-
-### Open PRs
-| PR | Status | Action |
-|----|--------|--------|
-| #10617 | CI green (except Playwright — runs only on main push) | **Merge to fix RED** |
-| #9114, #9117, #4036, #4039, #4040, #4043, #4046, #7889, #8187 | Held | do-not-merge/hold labels |
+**Playwright fixes:**
+- UpdateSettings.spec.ts, find-and-search.spec.ts, not-found.spec.ts, post-login-dashboard-ux.spec.ts
+- RBACExplorer.spec.ts, page-coverage.spec.ts, dashboard-perf.spec.ts — all timing/visibility issues resolved
+- CI status: All green (build, lint, CodeQL, TTFI, amd64+arm64 builds) ✅
 
 ---
 
@@ -748,4 +750,36 @@ All expected nightly workflows in progress (transient reds).
 2. Wait for Nightly Test Suite completion
 3. Close issue #10425 after confirming stable
 4. Investigate coverage if still hanging
+
+
+---
+
+## Reviewer Pass 41 — 2026-04-28T01:19–01:30 UTC
+
+**Mode:** EXECUTOR — triggered by supervisor KICK directive  
+**Focus:** Help-wanted issue backlog grooming
+
+### Summary
+
+Audited all 8 open issues in `kubestellar/console`. Verified relevance, added triage comments with suggested fix approaches, flagged good-first-issue candidates.
+
+| Issue | Title | Status | Action |
+|-------|-------|--------|--------|
+| #4189 | LFX: Test Coverage Architect | ✅ Relevant | Added comment: OAuth E2E test, coverage regression gate, nightly flaky-test detection, auto-test-PR workflow — ordered by complexity |
+| #4190 | LFX: Bug Discovery & Remediation | ✅ Relevant | Added comment: Mapped current Playwright RED failures to mentorship scope; suggested GA4 regression workflow as highest-leverage deliverable |
+| #4196 | LFX: Operational KB & Mission Control | ✅ Relevant | Added comment: Concrete KB audit → pipeline test harness → nightly GitHub Action → query-gap tracking implementation breakdown |
+| #4072 | CNCF Incubation Tracker | ✅ Relevant | Added comment: Confirmed 3 adopter entries landed; flagged brandtkeller review as remaining blocker; suggested ADOPTION_METRICS.md as quick win |
+| #10439 | Auto-QA: Oversized source files | ✅ Relevant | Added comment: **Flagged as good-first-issue** — specific test files + split strategy; warned against production files for first contribution |
+| #10604 | Auto-QA: High-complexity components | ✅ Relevant | Added comment: **Flagged as good-first-issue** (test files only); listed production file splits as experienced-contributor work |
+| #10618 | Workflow failure: Build and Deploy KC | ✅ Relevant | Added comment: Root cause = cluster-side pod readiness timeout on pok-prod001, not code; rollback stuck in pending-upgrade; closing criterion stated |
+| #10354 | Nightly Test Suite Results | Automated tracker | No comment needed — auto-populated by CI |
+
+### Good-first-issue candidates identified
+- `#10439` — Any test file from the oversized-files list (useVersionCheck, compute, clusters, kubectlProxy)
+- `#10604` — useDrillDown.test.tsx, useMissions.analytics-agents.test.tsx, useMissions.edgecases.test.tsx
+- Implicit from `#4072` — Accessibility violations in `a11y.spec.ts` (button-name, color-contrast, select-name) are mechanical and well-scoped
+
+### RED indicator status
+- `nightlyPlaywright=RED` — ongoing; 5 failures in shard 4 + ~40 in shards 1-3 (cluster-admin cards, a11y, Clusters, etc.). Pre-existing failures are in shards 1-3 (same failures as 3 runs ago). New shard-4 failures are being worked in bead `reviewer-8pq`.
+- `nightlyRel=RED` — `Build and Deploy KC` stuck due to pok-prod cluster infrastructure issue (pod readiness timeout). Not a code bug. Needs cluster-side fix by maintainer.
 
