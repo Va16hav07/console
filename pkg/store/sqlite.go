@@ -377,6 +377,7 @@ func (s *SQLiteStore) migrate() error {
 		title TEXT NOT NULL,
 		description TEXT NOT NULL,
 		request_type TEXT NOT NULL,
+		target_repo TEXT NOT NULL DEFAULT 'console',
 		github_issue_number INTEGER,
 		-- NOTE: github_issue_url was removed (#7735) — it was never
 		-- populated or read by any INSERT/SELECT/UPDATE query.  The
@@ -573,6 +574,10 @@ func (s *SQLiteStore) migrate() error {
 		// continue to read meaningful values, and pre-migration rows are
 		// transparently promoted to a one-element list on read.
 		"ALTER TABLE gpu_reservations ADD COLUMN gpu_types TEXT NOT NULL DEFAULT ''",
+		// target_repo was declared in the FeatureRequest model but never
+		// persisted — the column, INSERT, and SELECT all omitted it, causing
+		// webhook/close/update operations to route docs issues to the wrong repo.
+		"ALTER TABLE feature_requests ADD COLUMN target_repo TEXT NOT NULL DEFAULT 'console'",
 	}
 	for i, migration := range migrations {
 		if _, err := s.db.ExecContext(ctx, migration); err != nil {

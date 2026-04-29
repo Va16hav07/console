@@ -20,26 +20,29 @@ func (s *SQLiteStore) CreateFeatureRequest(ctx context.Context, request *models.
 	if request.Status == "" {
 		request.Status = models.RequestStatusOpen
 	}
+	if request.TargetRepo != models.TargetRepoConsole && request.TargetRepo != models.TargetRepoDocs {
+		request.TargetRepo = models.TargetRepoConsole
+	}
 
-	_, err := s.db.ExecContext(ctx, `INSERT INTO feature_requests (id, user_id, title, description, request_type, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	_, err := s.db.ExecContext(ctx, `INSERT INTO feature_requests (id, user_id, title, description, request_type, target_repo, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		request.ID.String(), request.UserID.String(), request.Title, request.Description, string(request.RequestType),
-		request.GitHubIssueNumber, string(request.Status),
+		string(request.TargetRepo), request.GitHubIssueNumber, string(request.Status),
 		request.PRNumber, nullString(request.PRURL), nullString(request.CopilotSessionURL), nullString(request.NetlifyPreviewURL), request.CreatedAt)
 	return err
 }
 
 func (s *SQLiteStore) GetFeatureRequest(ctx context.Context, id uuid.UUID) (*models.FeatureRequest, error) {
-	row := s.db.QueryRowContext(ctx, `SELECT id, user_id, title, description, request_type, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, latest_comment, created_at, updated_at FROM feature_requests WHERE id = ?`, id.String())
+	row := s.db.QueryRowContext(ctx, `SELECT id, user_id, title, description, request_type, target_repo, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, latest_comment, created_at, updated_at FROM feature_requests WHERE id = ?`, id.String())
 	return s.scanFeatureRequest(row)
 }
 
 func (s *SQLiteStore) GetFeatureRequestByIssueNumber(ctx context.Context, issueNumber int) (*models.FeatureRequest, error) {
-	row := s.db.QueryRowContext(ctx, `SELECT id, user_id, title, description, request_type, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, latest_comment, created_at, updated_at FROM feature_requests WHERE github_issue_number = ?`, issueNumber)
+	row := s.db.QueryRowContext(ctx, `SELECT id, user_id, title, description, request_type, target_repo, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, latest_comment, created_at, updated_at FROM feature_requests WHERE github_issue_number = ?`, issueNumber)
 	return s.scanFeatureRequest(row)
 }
 
 func (s *SQLiteStore) GetFeatureRequestByPRNumber(ctx context.Context, prNumber int) (*models.FeatureRequest, error) {
-	row := s.db.QueryRowContext(ctx, `SELECT id, user_id, title, description, request_type, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, latest_comment, created_at, updated_at FROM feature_requests WHERE pr_number = ?`, prNumber)
+	row := s.db.QueryRowContext(ctx, `SELECT id, user_id, title, description, request_type, target_repo, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, latest_comment, created_at, updated_at FROM feature_requests WHERE pr_number = ?`, prNumber)
 	return s.scanFeatureRequest(row)
 }
 
@@ -51,7 +54,7 @@ func (s *SQLiteStore) GetFeatureRequestByPRNumber(ctx context.Context, prNumber 
 func (s *SQLiteStore) GetUserFeatureRequests(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.FeatureRequest, error) {
 	lim := resolvePageLimit(limit, defaultPageLimit)
 	off := resolvePageOffset(offset)
-	rows, err := s.db.QueryContext(ctx, `SELECT id, user_id, title, description, request_type, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, latest_comment, created_at, updated_at FROM feature_requests WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`, userID.String(), lim, off)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, user_id, title, description, request_type, target_repo, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, latest_comment, created_at, updated_at FROM feature_requests WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`, userID.String(), lim, off)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +94,7 @@ func (s *SQLiteStore) CountUserPendingFeatureRequests(ctx context.Context, userI
 func (s *SQLiteStore) GetAllFeatureRequests(ctx context.Context, limit, offset int) ([]models.FeatureRequest, error) {
 	lim := resolvePageLimit(limit, defaultAdminPageLimit)
 	off := resolvePageOffset(offset)
-	rows, err := s.db.QueryContext(ctx, `SELECT id, user_id, title, description, request_type, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, latest_comment, created_at, updated_at FROM feature_requests ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`, lim, off)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, user_id, title, description, request_type, target_repo, github_issue_number, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, latest_comment, created_at, updated_at FROM feature_requests ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`, lim, off)
 	if err != nil {
 		return nil, err
 	}
@@ -111,13 +114,13 @@ func (s *SQLiteStore) GetAllFeatureRequests(ctx context.Context, limit, offset i
 func (s *SQLiteStore) scanFeatureRequest(row *sql.Row) (*models.FeatureRequest, error) {
 	var r models.FeatureRequest
 	var idStr, userIDStr string
-	var requestType, status string
+	var requestType, status, targetRepo string
 	var issueNumber, prNumber sql.NullInt64
 	var prURL, copilotSessionURL, previewURL, latestComment sql.NullString
 	var closedByUser sql.NullInt64
 	var updatedAt sql.NullTime
 
-	err := row.Scan(&idStr, &userIDStr, &r.Title, &r.Description, &requestType, &issueNumber, &status, &prNumber, &prURL, &copilotSessionURL, &previewURL, &closedByUser, &latestComment, &r.CreatedAt, &updatedAt)
+	err := row.Scan(&idStr, &userIDStr, &r.Title, &r.Description, &requestType, &targetRepo, &issueNumber, &status, &prNumber, &prURL, &copilotSessionURL, &previewURL, &closedByUser, &latestComment, &r.CreatedAt, &updatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -128,6 +131,7 @@ func (s *SQLiteStore) scanFeatureRequest(row *sql.Row) (*models.FeatureRequest, 
 	r.ID = parseUUID(idStr, "r.ID")
 	r.UserID = parseUUID(userIDStr, "r.UserID")
 	r.RequestType = models.RequestType(requestType)
+	r.TargetRepo = models.TargetRepo(targetRepo)
 	r.Status = models.RequestStatus(status)
 	if issueNumber.Valid {
 		num := int(issueNumber.Int64)
@@ -161,13 +165,13 @@ func (s *SQLiteStore) scanFeatureRequest(row *sql.Row) (*models.FeatureRequest, 
 func (s *SQLiteStore) scanFeatureRequestRow(ctx context.Context, rows *sql.Rows) (*models.FeatureRequest, error) {
 	var r models.FeatureRequest
 	var idStr, userIDStr string
-	var requestType, status string
+	var requestType, status, targetRepo string
 	var issueNumber, prNumber sql.NullInt64
 	var prURL, copilotSessionURL, previewURL, latestComment sql.NullString
 	var closedByUser sql.NullInt64
 	var updatedAt sql.NullTime
 
-	err := rows.Scan(&idStr, &userIDStr, &r.Title, &r.Description, &requestType, &issueNumber, &status, &prNumber, &prURL, &copilotSessionURL, &previewURL, &closedByUser, &latestComment, &r.CreatedAt, &updatedAt)
+	err := rows.Scan(&idStr, &userIDStr, &r.Title, &r.Description, &requestType, &targetRepo, &issueNumber, &status, &prNumber, &prURL, &copilotSessionURL, &previewURL, &closedByUser, &latestComment, &r.CreatedAt, &updatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +179,7 @@ func (s *SQLiteStore) scanFeatureRequestRow(ctx context.Context, rows *sql.Rows)
 	r.ID = parseUUID(idStr, "r.ID")
 	r.UserID = parseUUID(userIDStr, "r.UserID")
 	r.RequestType = models.RequestType(requestType)
+	r.TargetRepo = models.TargetRepo(targetRepo)
 	r.Status = models.RequestStatus(status)
 	if issueNumber.Valid {
 		num := int(issueNumber.Int64)
