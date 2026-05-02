@@ -1260,3 +1260,26 @@ Nominal — no anomalies.
 ### Outstanding
 - nightlyPlaywright RED: scanner owns — Issue #11348 open
 - PR #11380: awaiting CI pass
+
+## Pass 100 — 2026-05-02
+
+**Red indicators at start:** nightlyPlaywright=RED (scanner owns — not in scope)  
+**GA4:** nominal, no anomalies
+
+### HIGH issues — all resolved
+- PR#11326 `drasi_proxy_test.go:25` hop-by-hop header assertion: already in HEAD ✅
+- PR#11355 `FeedbackModal.tsx:234` OAuth param leak in page_url: already in HEAD ✅
+- PR#11380 `startup-oauth.sh:570` stale watchdog / parallel_build: resolved via PR#11382 (#0b418ec9b) ✅
+
+### MEDIUM issues addressed
+- PR#11379 `startup-oauth.sh` — `BACKEND_BUILD_PID` not in `cleanup()`, `set -e` race before error handler:
+  - Added `kill $BACKEND_BUILD_PID` to `cleanup()`; restructured `wait` with `|| true` + explicit exit-code capture
+  - Added idempotent `launch_kc_agent()` helper; agent started after each build section
+- Test improvements: events query-param coverage, topology service-name assertion, feedback_github markdown injection sanitization
+
+### Commits
+- `e56f90f3b` fix(startup-oauth.sh): track AGENT_BUILD_PID, launch agent after build
+- `5e6832048` 🐛 fix(tests): address medium Copilot review findings from PRs #11318, #11326, #11355
+
+### Playwright RED
+nightlyPlaywright=RED — scanner owns, not in scope for file-issue reviewer.
