@@ -64,7 +64,7 @@ jobs:
     name: Test (chromium, shard ${{ matrix.shard }})
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -86,7 +86,7 @@ jobs:
         run: npm ci
 
       - name: Download build artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: build-output
           path: web/dist
@@ -97,14 +97,14 @@ jobs:
       - name: Start preview server
         run: |
           npm run preview &
-          npx wait-on http://localhost:4173 --timeout 60000
+          npx wait-on http://localhost:4173 --timeout 120000
 
       - name: Run Playwright tests
         run: |
           if [ -n "${{ inputs.spec_filter }}" ]; then
-            npx playwright test --project=chromium --timeout=75000 --retries=2 "${{ inputs.spec_filter }}"
+            npx playwright test --project=chromium --timeout=75000 --retries=2 --shard=${{ matrix.shard }}/4 "${{ inputs.spec_filter }}"
           else
-            npx playwright test --project=chromium --timeout=75000 --retries=1 --shard=${{ matrix.shard }}/4
+            npx playwright test --project=chromium --shard=${{ matrix.shard }}/4
           fi
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:4173
@@ -141,7 +141,7 @@ jobs:
 
       - name: Download all blob reports
         id: download-reports
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         continue-on-error: true
         with:
           pattern: blob-report-*
@@ -254,7 +254,7 @@ jobs:
     name: Mobile Browser Tests
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: web
@@ -272,7 +272,7 @@ jobs:
         run: npm ci
 
       - name: Download build artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: build-output
           path: web/dist
@@ -283,15 +283,13 @@ jobs:
       - name: Start preview server
         run: |
           npm run preview &
-          npx wait-on http://localhost:4173 --timeout 60000
+          npx wait-on http://localhost:4173 --timeout 120000
 
       - name: Run mobile tests
         run: |
           npx playwright test \
             --project=mobile-chrome \
-            --project=mobile-safari \
-            --timeout=75000 \
-            --retries=2
+            --project=mobile-safari
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:4173
 
@@ -326,7 +324,7 @@ jobs:
         run: npm ci
 
       - name: Download build artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: build-output
           path: web/dist
@@ -337,7 +335,7 @@ jobs:
       - name: Start preview server
         run: |
           npm run preview &
-          npx wait-on http://localhost:4173 --timeout 60000
+          npx wait-on http://localhost:4173 --timeout 120000
 
       - name: Run accessibility tests
         run: |
@@ -347,3 +345,8 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:4173
         continue-on-error: true
+
+  # Visual regression testing moved to .github/workflows/visual-regression.yml
+  # The previous job here was non-functional (--update-snapshots always passed,
+  # continue-on-error swallowed failures). The new workflow uses committed
+  # baselines and blocks PRs on visual regressions.
