@@ -9,7 +9,7 @@
 
 import type { Alert } from '../types/alerts'
 import { safeGet, safeSet, safeRemove, safeGetJSON } from '../lib/safeLocalStorage'
-import { STORAGE_KEY_AUTH_TOKEN, FETCH_DEFAULT_TIMEOUT_MS, STORAGE_KEY_NOTIFIED_ALERT_KEYS } from '../lib/constants'
+import { STORAGE_KEY_NOTIFIED_ALERT_KEYS } from '../lib/constants'
 import { MS_PER_MINUTE, MS_PER_HOUR } from '../lib/constants/time'
 
 /** Storage key for alerts */
@@ -144,5 +144,4 @@ export function saveAlerts(alerts: Alert[]): void {
   }
 }
 
-/** Export constants used by other modules */
-export { FETCH_DEFAULT_TIMEOUT_MS, STORAGE_KEY_AUTH_TOKEN }
+
