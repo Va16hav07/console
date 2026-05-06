@@ -566,7 +566,7 @@ export default async (req: Request) => {
       data,
       expiresAt: Date.now() + CACHE_TTL_MS,
     };
-    store.set(cacheKey, JSON.stringify(entry)).catch(() => {});
+    store.set(cacheKey, JSON.stringify(entry)).catch((err) => { console.warn("[acmm-scan] blob cache write failed:", err instanceof Error ? err.message : err) });
 
     return new Response(JSON.stringify(data), {
       status: 200,

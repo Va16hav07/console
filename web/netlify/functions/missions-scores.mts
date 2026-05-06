@@ -128,7 +128,7 @@ export default async (request: Request): Promise<Response> => {
           return jsonResponse(corsHeaders, { error: "response too large" }, 413);
         }
         const entry: CacheEntry = { body: bodyText, contentType: "application/json", fetchedAt: Date.now() };
-        store.setJSON(cacheKey, entry).catch(() => {});
+        store.setJSON(cacheKey, entry).catch((err) => { console.warn("[missions-scores] blob cache write failed:", err instanceof Error ? err.message : err) });
       }
     }
 

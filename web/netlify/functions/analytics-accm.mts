@@ -608,7 +608,7 @@ export default async (req: Request) => {
       data: gistData,
       expiresAt: Date.now() + CACHE_TTL_MS,
     };
-    store.set(CACHE_KEY, JSON.stringify(cacheEntry)).catch(() => {});
+    store.set(CACHE_KEY, JSON.stringify(cacheEntry)).catch((err) => { console.warn("[analytics-accm] blob cache write failed:", err instanceof Error ? err.message : err) });
     return new Response(JSON.stringify({ ...gistData, source: "gist" }), {
       status: 200,
       headers: { ...headers, "Content-Type": "application/json" },
@@ -625,7 +625,7 @@ export default async (req: Request) => {
       data,
       expiresAt: Date.now() + CACHE_TTL_MS,
     };
-    store.set(CACHE_KEY, JSON.stringify(cacheEntry)).catch(() => {});
+    store.set(CACHE_KEY, JSON.stringify(cacheEntry)).catch((err) => { console.warn("[analytics-accm] blob cache write failed:", err instanceof Error ? err.message : err) });
 
     return new Response(JSON.stringify(data), {
       status: 200,

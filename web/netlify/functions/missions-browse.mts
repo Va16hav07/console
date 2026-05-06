@@ -138,7 +138,7 @@ export default async (request: Request): Promise<Response> => {
 
     // Store in cache (best-effort, don't block response)
     const entry: BrowseCacheEntry = { body, fetchedAt: Date.now() };
-    store.setJSON(cacheKey, entry).catch(() => {});
+    store.setJSON(cacheKey, entry).catch((err) => { console.warn("[missions-browse] blob cache write failed:", err instanceof Error ? err.message : err) });
 
     return new Response(body, {
       status: 200,

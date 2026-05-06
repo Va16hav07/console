@@ -203,7 +203,7 @@ async function getAccessToken(
     accessToken,
     expiresAt: Date.now() + expiresIn * 1000,
   };
-  store.set(TOKEN_CACHE_KEY, JSON.stringify(cacheEntry)).catch(() => {});
+  store.set(TOKEN_CACHE_KEY, JSON.stringify(cacheEntry)).catch((err) => { console.warn("[analytics-dashboard] blob cache write failed:", err instanceof Error ? err.message : err) });
 
   return accessToken;
 }
@@ -952,7 +952,7 @@ export default async (req: Request) => {
         cacheKey,
         JSON.stringify({ data, expiresAt: Date.now() + CACHE_TTL_MS })
       )
-      .catch(() => {});
+      .catch((err) => { console.warn("[analytics-dashboard] blob cache write failed:", err instanceof Error ? err.message : err) });
 
     return new Response(JSON.stringify({ ...data, filterMode }), {
       status: 200,

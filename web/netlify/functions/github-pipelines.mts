@@ -591,7 +591,7 @@ async function buildMatrix(
   // Merge freshest data into the history blob so 90-day ranges work
   const history = await readHistory(store);
   mergeIntoHistory(history, freshRuns);
-  await writeHistory(store, history).catch(() => {});
+  await writeHistory(store, history).catch((err) => { console.warn("[github-pipelines] history write failed:", err instanceof Error ? err.message : err) });
 
   // Build the date range (oldest → newest)
   const range: string[] = [];
@@ -963,7 +963,7 @@ export default async (req: Request): Promise<Response> => {
     // Wrap payload with the repo list so the client never hardcodes it.
     // Cards read `repos` from the response to populate their filter dropdown.
     const wrapped = { ...(payload as Record<string, unknown>), repos: REPOS };
-    await writeCache(store, cacheKey, wrapped).catch(() => {});
+    await writeCache(store, cacheKey, wrapped).catch((err) => { console.warn("[github-pipelines] blob cache write failed:", err instanceof Error ? err.message : err) });
     return jsonResponse(wrapped, {
       headers: {
         ...baseHeaders,

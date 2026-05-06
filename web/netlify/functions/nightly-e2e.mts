@@ -325,7 +325,7 @@ async function fetchGuideImages(
     images: result,
     expiresAt: Date.now() + IMAGE_CACHE_TTL_MS,
   };
-  store.set(IMAGE_CACHE_KEY, JSON.stringify(cacheEntry)).catch(() => {});
+  store.set(IMAGE_CACHE_KEY, JSON.stringify(cacheEntry)).catch((err) => { console.warn("[nightly-e2e] blob cache write failed:", err instanceof Error ? err.message : err) });
 
   return result;
 }
@@ -458,7 +458,7 @@ async function enrichRunsWithImages(
 
   // Persist updated cache (best-effort)
   if (cacheUpdated) {
-    store.set(RUN_IMAGE_CACHE_KEY, JSON.stringify(cache)).catch(() => {});
+    store.set(RUN_IMAGE_CACHE_KEY, JSON.stringify(cache)).catch((err) => { console.warn("[nightly-e2e] run-image cache write failed:", err instanceof Error ? err.message : err) });
   }
 }
 
@@ -684,7 +684,7 @@ export default async (req: Request) => {
       cachedAt: now,
       expiresAt: Date.now() + ttl,
     };
-    store.set(CACHE_KEY, JSON.stringify(cacheEntry)).catch(() => {});
+    store.set(CACHE_KEY, JSON.stringify(cacheEntry)).catch((err) => { console.warn("[nightly-e2e] blob cache write failed:", err instanceof Error ? err.message : err) });
 
     return new Response(
       JSON.stringify({ guides, cachedAt: now, fromCache: false }),

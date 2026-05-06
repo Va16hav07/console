@@ -77,7 +77,7 @@ export default async (req: Request) => {
         const ts = parseInt(raw, 10);
         if (ts < cutoff) {
           // Expired — clean up in background (best-effort)
-          store.delete(blob.key).catch(() => {});
+          store.delete(blob.key).catch((err) => { console.warn("[presence] blob delete failed:", err instanceof Error ? err.message : err) });
           return false;
         }
         return true;
