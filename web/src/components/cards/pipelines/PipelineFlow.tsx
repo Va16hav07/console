@@ -12,7 +12,7 @@
  * Data: /api/github-pipelines?view=flow. Client polls every 10s (Drasi's
  * cadence) so the flow looks live without hammering the function.
  */
-import { useState, useMemo, useRef, useLayoutEffect, useEffect, type CSSProperties } from 'react'
+import { useState, useMemo, useRef, useLayoutEffect, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { RefreshCw, XCircle, ExternalLink, Stethoscope } from 'lucide-react'
 import { useReducedMotion } from 'framer-motion'
@@ -37,6 +37,7 @@ import { cn } from '../../../lib/cn'
 const FLOW_DOT_RADIUS_PX = 2.5
 /** Per-segment animation duration */
 const FLOW_DUR_S = 2.2
+const PIPELINE_FLOW_GRID_STYLE = { gridTemplateColumns: '100px 180px 1fr 1fr' } as const
 /** Max jobs rendered per run before "+N more" truncation (visual cap) */
 const MAX_JOBS_VISIBLE = 5
 /** Max steps per job rendered in the flow */
@@ -192,7 +193,7 @@ function RunRow({ run, onCancel, canMutate, mutating }: RunRowProps) {
     <div
       ref={containerRef}
       className="relative grid gap-4 items-start py-3 border-t border-border/40"
-      style={{ gridTemplateColumns: '100px 180px 1fr 1fr' } as CSSProperties}
+      style={PIPELINE_FLOW_GRID_STYLE}
     >
       <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">
         {lines.map((l, i) => <FlowLine key={i} {...l} />)}
