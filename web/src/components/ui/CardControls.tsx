@@ -1,5 +1,5 @@
 import { ChevronDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import { type KeyboardEvent, useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/cn'
 import { emitCardSortChanged, emitCardSortDirectionChanged, emitCardLimitChanged } from '../../lib/analytics'
 import { useCardType } from '../cards/CardWrapper'
@@ -56,6 +56,8 @@ export function CardControls<T extends string = string>({
   const [sortOpen, setSortOpen] = useState(false)
   const limitRef = useRef<HTMLDivElement>(null)
   const sortRef = useRef<HTMLDivElement>(null)
+  const sortMenuRef = useRef<HTMLDivElement>(null)
+  const shouldFocusSortOptionRef = useRef(false)
 
   const toggleDirection = () => {
     if (onSortDirectionChange) {
@@ -78,6 +80,34 @@ export function CardControls<T extends string = string>({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (!sortOpen || !shouldFocusSortOptionRef.current) return
+    const items = sortMenuRef.current?.querySelectorAll<HTMLElement>('[role="option"]:not([disabled])')
+    items?.[0]?.focus()
+    shouldFocusSortOptionRef.current = false
+  }, [sortOpen])
+
+  const handleSortToggle = () => {
+    const nextSortOpen = !sortOpen
+    if (!nextSortOpen) {
+      shouldFocusSortOptionRef.current = false
+    }
+    setSortOpen(nextSortOpen)
+    setLimitOpen(false)
+  }
+
+  const handleSortTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      shouldFocusSortOptionRef.current = true
+    }
+
+    if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !sortOpen) {
+      event.preventDefault()
+      setSortOpen(true)
+      setLimitOpen(false)
+    }
+  }
 
   const currentLimitLabel = LIMIT_OPTIONS.find(o => o.value === limit)?.label || '5'
   const currentSortLabel = sortOptions?.find(o => o.value === sortBy)?.label || sortBy
@@ -134,18 +164,25 @@ export function CardControls<T extends string = string>({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setSortOpen(!sortOpen); setLimitOpen(false) }}
+              onClick={handleSortToggle}
+              onKeyDown={handleSortTriggerKeyDown}
+              aria-haspopup="listbox"
+              aria-expanded={sortOpen}
               className="bg-secondary/50 hover:bg-secondary"
               iconRight={<ChevronDown className={cn('w-3 h-3 transition-transform', sortOpen && 'rotate-180')} />}
             >
               Sort: {currentSortLabel}
             </Button>
             {sortOpen && (
-              <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 min-w-[100px] py-1"
+              <div
+                ref={sortMenuRef}
+                role="listbox"
+                aria-label="Sort options"
+                className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 min-w-[100px] py-1"
                 onKeyDown={(e) => {
                   if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
                   e.preventDefault()
-                  const items = e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled])')
+                  const items = e.currentTarget.querySelectorAll<HTMLElement>('[role="option"]:not([disabled])')
                   const idx = Array.from(items).indexOf(document.activeElement as HTMLElement)
                   if (e.key === 'ArrowDown') items[Math.min(idx + 1, items.length - 1)]?.focus()
                   else items[Math.max(idx - 1, 0)]?.focus()
@@ -157,6 +194,9 @@ export function CardControls<T extends string = string>({
                     variant="ghost"
                     size="sm"
                     onClick={() => { onSortChange(option.value); setSortOpen(false); emitCardSortChanged(option.value, cardType) }}
+                    role="option"
+                    aria-selected={sortBy === option.value}
+                    tabIndex={0}
                     className={cn(
                       'w-full justify-start px-3 py-1.5 text-xs',
                       sortBy === option.value ? 'text-primary bg-primary/10' : 'text-foreground'
