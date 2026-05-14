@@ -116,7 +116,7 @@ function createVersionWsHandle(): VersionWsHandle {
     rejectAllPending()
   }
 
-  function ensureWs(): Promise<WebSocket> {
+  async function ensureWs(): Promise<WebSocket> {
     if (destroyed) return Promise.reject(new Error('Handle destroyed'))
 
     if (ws?.readyState === WebSocket.OPEN) {
@@ -124,7 +124,7 @@ function createVersionWsHandle(): VersionWsHandle {
     }
 
     if (connecting) {
-      return new Promise(async (resolve, reject) => {
+      return new Promise((resolve, reject) => {
         const checkInterval = setInterval(() => {
           if (destroyed) { clearInterval(checkInterval); reject(new Error('Handle destroyed')); return }
           if (ws?.readyState === WebSocket.OPEN) { clearInterval(checkInterval); resolve(ws) }
@@ -144,31 +144,42 @@ function createVersionWsHandle(): VersionWsHandle {
 
     connecting = true
 
-    return new Promise(async (resolve, reject) => {
+    let wsUrl: string
+    try {
+      wsUrl = await appendWsAuthToken(LOCAL_AGENT_WS_URL)
+    } catch {
+      connecting = false
+      return Promise.reject(new Error('Failed to get auth token'))
+    }
+
+    return new Promise((resolve, reject) => {
+      let localWs: WebSocket
       try {
-        ws = new WebSocket(await appendWsAuthToken(LOCAL_AGENT_WS_URL))
+        localWs = new WebSocket(wsUrl)
       } catch {
         connecting = false
         reject(new Error('Failed to create WebSocket'))
         return
       }
 
+      ws = localWs
+
       const connectionTimeout = setTimeout(() => {
         connecting = false
-        if (ws?.readyState !== WebSocket.OPEN) {
+        if (localWs?.readyState !== WebSocket.OPEN) {
           closeWs()
           reject(new Error('WebSocket connection timeout'))
         }
       }, VERSION_REQUEST_TIMEOUT_MS)
 
-      ws.onopen = () => {
+      localWs.onopen = () => {
         clearTimeout(connectionTimeout)
         connecting = false
         if (destroyed) { closeWs(); reject(new Error('Handle destroyed')); return }
-        resolve(ws!)
+        resolve(localWs!)
       }
 
-      ws.onmessage = (event) => {
+      localWs.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data)
           const resolver = pendingRequests.get(msg.id)
@@ -190,14 +201,14 @@ function createVersionWsHandle(): VersionWsHandle {
         }
       }
 
-      ws.onerror = () => {
+      localWs.onerror = () => {
         clearTimeout(connectionTimeout)
         connecting = false
         rejectAllPending()
         reject(new Error('WebSocket error'))
       }
 
-      ws.onclose = () => {
+      localWs.onclose = () => {
         clearTimeout(connectionTimeout)
         connecting = false
         ws = null
@@ -218,7 +229,7 @@ function createVersionWsHandle(): VersionWsHandle {
       const socket = await ensureWs()
       const requestId = `version-${clusterName}-${Date.now()}`
 
-      return new Promise(async (resolve) => {
+      return new Promise((resolve) => {
         const timeout = setTimeout(() => {
           pendingRequests.delete(requestId)
           resolve(getCachedVersion(clusterName))
