@@ -18,6 +18,34 @@ This plan explicitly excludes:
 
 ---
 
+## Current Project Status (as of May 15, 2026)
+
+Since the mentorship tracker opened on **April 1, 2026**, Mission Control itself has undergone significant hardening in the console repository. The following streams were recently merged and should be treated as the baseline foundation for this architecture:
+
+- Request-approval and deep-link review flow
+- Configurable mission timeout + primary-agent preference handling
+- Session ownership enforcement on cancel + async WS dispatch
+- Deep-link slug collision fixes
+- Orbit resource targeting (namespaced and cluster-scoped) + post-mission monitoring offer
+- Stale-session completion-state preservation fixes
+- Journey-oriented Mission Control stress tests
+- Agent tool-permission fixes (Write/Edit/Glob/Grep)
+- ACMM scan auto-refresh on mission completion
+- Kubara Mission Control integration and mission-explorer UX additions
+- Broad lifecycle/contract/cross-tab/waiting_input/timeout reliability fixes
+
+**Interpretation:** Mission Control control-plane UX and lifecycle plumbing are actively stabilizing. The highest-leverage remaining work for this track is operational-KB validation automation (nightly live-cluster revalidation, query-gap feedback, and auto-drafted missing content).
+
+---
+
+## What “Missions” Mean in This Architecture
+
+A mission is a structured, stateful operational workflow executed through Mission Control, with lifecycle states (pending/running/waiting_input/completed/failed/blocked/cancelled), AI message history, optional cluster scope, and typed intent (`upgrade`, `troubleshoot`, `deploy`, `repair`, `analyze`, `maintain`, etc.).
+
+For this architecture, “mission validation” means verifying that a user intent can be resolved to usable KB content, transformed into executable/safe commands, and completed successfully on a real cluster with post-condition checks.
+
+---
+
 ## High-Level Architecture
 
 ```text
@@ -90,22 +118,22 @@ Each operation entry should include:
 
 ## End-to-End Validation Pipeline
 
-## 1) Query-to-KB validation
+### 1) Query-to-KB validation
 - Feed representative user questions per operation category.
 - Assert a deterministic KB retrieval target (or top-N relevance threshold).
 - Flag no-result and low-confidence hits.
 
-## 2) KB-to-command validation
+### 2) KB-to-command validation
 - Ensure generated command sequence references only approved tools (`kubectl`, `helm`, `kustomize`, etc.).
 - Validate syntax and placeholders before execution.
 - Block unsafe/destructive steps unless in explicit destructive test lanes.
 
-## 3) Command-to-cluster validation
+### 3) Command-to-cluster validation
 - Execute in disposable clusters (kind/k3d or cloud sandbox).
 - Capture stdout/stderr, events, and resource diffs.
 - Assert post-conditions from KB metadata.
 
-## 4) Result classification
+### 4) Result classification
 - `PASS`: all assertions satisfied.
 - `FAIL_CONTENT`: outdated or incorrect KB instructions.
 - `FAIL_ENV`: infrastructure drift / missing dependency.
