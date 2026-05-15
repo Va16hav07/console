@@ -1,220 +1,60 @@
-# Mission Control Operational Knowledge Architecture
+# Mission Control Operational Knowledge Architecture Plan
 
-## Purpose
+## Summary
 
-Define a single architecture for building, validating, and continuously improving the operational knowledge base (KB) that powers KubeStellar Console Mission Control.
+Build and continuously validate the operational knowledge base that powers KubeStellar Console's Mission Control AI assistant. The mentee curates operational content (runbooks, installers, YAML templates, troubleshooting fixes), tests the full mission-control execution pipeline end-to-end, and builds autonomous GitHub Actions workflows that re-validate all content against live clusters nightly.
 
-This plan is **strictly scoped** to:
-- Operational knowledge content (runbooks, install/upgrade/rollback flows, YAML templates, known fixes)
-- End-to-end mission-control pipeline validation (`user query -> KB retrieval -> command generation -> cluster execution`)
-- Autonomous nightly re-validation and stale-content detection
-- KB gap detection and draft generation for missing coverage
+## Background
 
-This plan explicitly excludes:
-- UI test infrastructure
-- Generic test coverage programs
-- Production telemetry/GA4 error analysis
-- Companion bug-discovery or test-coverage mentorship tracks
+KubeStellar Console's Mission Control feature uses an AI assistant backed by `console-kb` to help users perform operational tasks — installations, upgrades, troubleshooting, and multi-cluster sync fixes. The knowledge base needs comprehensive, validated operational content, and the mission-control pipeline (`user question -> KB lookup -> command generation -> execution`) needs end-to-end testing to ensure generated commands actually work on real clusters.
 
----
+## Scope
 
-## Current Project Status (as of May 15, 2026)
+- Audit existing KubeStellar guides, installers, Helm charts, and troubleshooting docs for gaps.
+- Generate runbooks for common operations: install, upgrade, rollback, disaster recovery, and multi-cluster sync failures.
+- Build a library of validated YAML templates and fixes for known issues.
+- Test the full mission-control execution pipeline: AI assistant interprets request -> finds KB content -> generates commands -> executes successfully on a real cluster.
+- Build automated validation: spin up test clusters, run mission-control operations, and verify outcomes.
+- Catch failures: wrong YAML, outdated commands, missing prerequisites, and broken install sequences.
+- Build a GitHub Actions workflow that nightly re-validates all KB operational content against live clusters and auto-files issues when content goes stale.
+- Track KB query gaps (which user queries return no results or bad results) and auto-generate drafts for missing content.
+- Deliver 2 community call presentations (midpoint + final).
 
-Since the mentorship tracker opened on **April 1, 2026**, Mission Control itself has undergone significant hardening in the console repository. The following streams were recently merged and should be treated as the baseline foundation for this architecture:
+## Approach
 
-- Request-approval and deep-link review flow
-- Configurable mission timeout + primary-agent preference handling
-- Session ownership enforcement on cancel + async WS dispatch
-- Deep-link slug collision fixes
-- Orbit resource targeting (namespaced and cluster-scoped) + post-mission monitoring offer
-- Stale-session completion-state preservation fixes
-- Journey-oriented Mission Control stress tests
-- Agent tool-permission fixes (Write/Edit/Glob/Grep)
-- ACMM scan auto-refresh on mission completion
-- Kubara Mission Control integration and mission-explorer UX additions
-- Broad lifecycle/contract/cross-tab/waiting_input/timeout reliability fixes
+The mentee will use an advanced AI coding agent as their primary tool for content generation, test automation, and validation pipeline development. Evaluation is based on KB coverage, mission-control test pass rates, and the reliability of autonomous validation workflows — not on manually written lines of code.
 
-**Interpretation:** Mission Control control-plane UX and lifecycle plumbing are actively stabilizing. The highest-leverage remaining work for this track is operational-KB validation automation (nightly live-cluster revalidation, query-gap feedback, and auto-drafted missing content).
+## Requirements
 
----
+- Active subscription to an advanced AI coding agent capable of autonomous multi-file code generation.
+- Familiarity with Kubernetes operations (`kubectl`, `helm`, YAML).
+- Basic understanding of CI/CD and GitHub Actions.
+- Technical writing ability for operational documentation.
 
-## What “Missions” Mean in This Architecture
-
-A mission is a structured, stateful operational workflow executed through Mission Control, with lifecycle states (pending/running/waiting_input/completed/failed/blocked/cancelled), AI message history, optional cluster scope, and typed intent (`upgrade`, `troubleshoot`, `deploy`, `repair`, `analyze`, `maintain`, etc.).
-
-For this architecture, “mission validation” means verifying that a user intent can be resolved to usable KB content, transformed into executable/safe commands, and completed successfully on a real cluster with post-condition checks.
-
----
-
-## High-Level Architecture
+## Architecture and Validation Flow
 
 ```text
-User Question
-   |
-   v
-Mission Control API / Assistant
-   |
-   v
-KB Retrieval Layer (console-kb index + documents)
-   |
-   v
-Command Synthesis Layer (steps, kubectl/helm commands, YAML refs)
-   |
-   v
-Execution Harness (ephemeral test clusters)
-   |
-   v
-Outcome Verifier (health checks + assertions)
-   |
-   +--> Validation Reports (pass/fail + root cause)
-   |
-   +--> Nightly GitHub Action (re-validation)
-   |
-   +--> Auto-Issue Creator (stale/failed content)
-   |
-   +--> Query Gap Analyzer (no-result / low-confidence queries)
-           |
-           v
-       Draft Content Generator (PR-ready runbook/template skeletons)
+User question
+  -> Mission Control request handling
+  -> KB lookup in console-kb
+  -> command generation from validated runbook content
+  -> execution against test cluster(s)
+  -> post-execution verification
+  -> pass/fail classification and evidence capture
+  -> nightly re-validation automation + issue creation + gap draft generation
 ```
 
----
+## Deliverables and Success Criteria
 
-## Repository Responsibilities
+- Runbooks covering install, upgrade, rollback, disaster recovery, and multi-cluster sync failures.
+- Library of validated YAML templates and known-fix patches.
+- End-to-end mission-control pipeline tests (`query -> KB -> command generation -> cluster execution`).
+- Nightly GitHub Actions workflow that re-validates KB content against live clusters and auto-files actionable issues.
+- KB gap analysis workflow that tracks no-result/low-quality-result queries and auto-generates missing-content drafts.
+- At least 90% of operational KB content validated as working on current KubeStellar versions.
+- Documented KB contribution guide for future contributors.
+- Two community call presentations (midpoint and final).
 
-### `kubestellar/console-kb`
-- Canonical operational content source.
-- Contains runbooks, mission definitions, YAML templates, prerequisites, and troubleshooting fixes.
-- Includes metadata needed for automated validation:
-  - Supported KubeStellar/Kubernetes version ranges
-  - Preconditions
-  - Safety level (`read-only`, `safe-write`, `destructive`)
-  - Expected outcomes and rollback steps
+## Program Boundary
 
-### `kubestellar/console`
-- Hosts Mission Control API integration and validation automation entry points.
-- Owns:
-  - E2E pipeline tests
-  - Nightly GitHub Actions workflows
-  - Gap tracking and stale-content issue automation
-
----
-
-## Content Model (for each KB operation)
-
-Each operation entry should include:
-
-1. **Intent**: What user outcome this achieves.
-2. **Prerequisites**: Cluster state, permissions, tool versions.
-3. **Inputs**: Required parameters with defaults/examples.
-4. **Execution Plan**: Ordered commands and YAML artifacts.
-5. **Verification**: Machine-checkable assertions (resource exists, status healthy, logs clean).
-6. **Rollback/Recovery**: Steps to safely undo changes.
-7. **Failure Signatures**: Known errors and remediations.
-8. **Compatibility Matrix**: Supported versions.
-9. **Validation Metadata**: Last validated date, workflow run id, environment profile.
-
----
-
-## End-to-End Validation Pipeline
-
-### 1) Query-to-KB validation
-- Feed representative user questions per operation category.
-- Assert a deterministic KB retrieval target (or top-N relevance threshold).
-- Flag no-result and low-confidence hits.
-
-### 2) KB-to-command validation
-- Ensure generated command sequence references only approved tools (`kubectl`, `helm`, `kustomize`, etc.).
-- Validate syntax and placeholders before execution.
-- Block unsafe/destructive steps unless in explicit destructive test lanes.
-
-### 3) Command-to-cluster validation
-- Execute in disposable clusters (kind/k3d or cloud sandbox).
-- Capture stdout/stderr, events, and resource diffs.
-- Assert post-conditions from KB metadata.
-
-### 4) Result classification
-- `PASS`: all assertions satisfied.
-- `FAIL_CONTENT`: outdated or incorrect KB instructions.
-- `FAIL_ENV`: infrastructure drift / missing dependency.
-- `FAIL_GENERATION`: assistant generated incorrect command sequence.
-
----
-
-## Nightly Autonomous Workflow Design
-
-Nightly GitHub Action should run four stages:
-
-1. **Inventory Stage**
-   - Enumerate all operational KB entries.
-   - Build a validation matrix by operation type and version profile.
-
-2. **Execution Stage**
-   - Provision test clusters.
-   - Run operation validations in parallel shards.
-
-3. **Analysis Stage**
-   - Compute pass rate and staleness signals.
-   - Enforce SLO: `>= 90%` operational entries passing on current supported versions.
-
-4. **Response Stage**
-   - Auto-file issues for:
-     - stale content
-     - broken command paths
-     - prerequisite drift
-   - Attach logs, failing step, suggested owner labels, and repro commands.
-
----
-
-## KB Gap Feedback Loop
-
-1. Collect query logs from Mission Control where:
-   - no KB match returned, or
-   - command execution failed due to insufficient guidance.
-2. Cluster similar missing intents.
-3. Auto-generate content drafts (runbook/template skeletons) with:
-   - intent
-   - prerequisites
-   - candidate commands
-   - validation checklist
-4. Open draft PRs/issues for human review and merge.
-
-Success metric: gap backlog trends downward week-over-week.
-
----
-
-## Deliverables Map (Mentorship Outcomes)
-
-1. Runbooks for install, upgrade, rollback, disaster recovery, and multi-cluster sync failures.
-2. Validated YAML/fix library for common operational issues.
-3. End-to-end mission-control execution tests with real cluster assertions.
-4. Nightly autonomous validation workflow with auto-issue filing.
-5. Gap analysis and draft generation automation for missing content.
-6. `>=90%` validated operational KB pass rate on current KubeStellar versions.
-7. KB contribution guide for future contributors.
-8. Midpoint and final community call reports.
-
----
-
-## Suggested Milestones (Jun-Aug)
-
-- **Weeks 1-2**: Baseline audit and taxonomy for all operations.
-- **Weeks 3-5**: Core runbook + YAML template generation and first validation harness.
-- **Week 6**: Midpoint presentation with pass-rate baseline.
-- **Weeks 7-9**: Full E2E pipeline hardening + nightly issue automation.
-- **Weeks 10-11**: Gap-driven draft generation loop and contributor guide.
-- **Week 12**: Final presentation with coverage/pass-rate outcomes and next-step backlog.
-
----
-
-## Governance and Quality Gates
-
-- Every KB change must include executable verification steps.
-- No operation is marked complete without a passing cluster execution record.
-- Failing nightly validations auto-open issues and block "validated" status.
-- Track three KPIs:
-  - Operational KB validation pass rate
-  - No-result query rate
-  - Mean time to refresh stale content
-
-This architecture keeps Mission Control operational knowledge continuously testable, measurable, and self-healing as the KubeStellar ecosystem evolves.
+This track focuses exclusively on operational knowledge content, mission-control pipeline validation, and KB coverage/reliability automation. It does **not** include UI test infrastructure, broad coverage metrics programs, production error analytics, or GA4 analysis.
