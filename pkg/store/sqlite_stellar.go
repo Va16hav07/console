@@ -268,7 +268,9 @@ func (s *SQLiteStore) ListStellarExecutions(ctx context.Context, userID, mission
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, *exec)
+		if exec != nil {
+			results = append(results, *exec)
+		}
 	}
 	return results, rows.Err()
 }
@@ -340,7 +342,9 @@ func (s *SQLiteStore) ListStellarActions(ctx context.Context, userID, status str
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, *action)
+		if action != nil {
+			results = append(results, *action)
+		}
 	}
 	return results, rows.Err()
 }
@@ -418,6 +422,9 @@ func (s *SQLiteStore) CompleteDueStellarActions(ctx context.Context, now time.Ti
 		if scanErr != nil {
 			return nil, scanErr
 		}
+		if action == nil {
+			continue
+		}
 		outcome := fmt.Sprintf("Executed %s for %s in %s", action.ActionType, action.Cluster, action.Namespace)
 		_, err = s.db.ExecContext(ctx, `UPDATE stellar_actions SET status = 'completed', executed_at = CURRENT_TIMESTAMP, outcome = ? WHERE id = ? AND status = 'approved'`,
 			outcome, action.ID)
@@ -451,6 +458,9 @@ func (s *SQLiteStore) GetDueApprovedStellarActions(ctx context.Context, now time
 		action, scanErr := scanStellarActionRow(rows)
 		if scanErr != nil {
 			return nil, scanErr
+		}
+		if action == nil {
+			continue
 		}
 		results = append(results, *action)
 	}
@@ -1335,6 +1345,9 @@ func (s *SQLiteStore) GetExecutionsSince(ctx context.Context, since time.Time) (
 		item, scanErr := scanStellarExecutionRow(rows)
 		if scanErr != nil {
 			return nil, scanErr
+		}
+		if item == nil {
+			continue
 		}
 		out = append(out, *item)
 	}
